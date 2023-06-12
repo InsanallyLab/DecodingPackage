@@ -1,0 +1,16 @@
+
+TODO: 
+
+- Refactor to modular code files. 
+- Write function specs + documentation 
+- evaluate cache policy ?
+- High level tests for both old codebases + write some result invariants 
+- Unit Tests 
+- Integration Tests 
+
+- Code Specific Notes: 
+    - Remove SingleNameSpace() instances (change to list / dict / python class)
+    - Reduce Session File dependency across code base. 
+    - Refactor (while True) in synthetic_spiketrain() 
+    - Make an enum for categories and conditions 
+    - 

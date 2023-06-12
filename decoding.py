@@ -268,28 +268,12 @@ def K_fold_strat(sessionfile,trials,K):
         train_test_pairs.append((train_trials,test_trials))
     return train_test_pairs
 
-
-
-
-
-
-
-
-
-
-
-
-
 ################################### Bandwidth #################################
 
 def getBWs_elife2019():
     #RNN
     return np.linspace(.005, 0.305, 11)
-    #Insanally 2017 set_bw_in_time
-    #return np.linspace(.010, .500, 50)
-    #Insanally 2017 set_bw
-    #return np.linspace(.001, 1.00, 100)
-
+  
 def sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,interval,folds = 50):
     conditions = getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
     
@@ -308,8 +292,6 @@ def sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,interval,folds =
                     cv=folds) # 20-fold cross-validation
     grid.fit(LogISIs)
     return grid.best_params_['bandwidth']
-
-
 
 ################################### Training ##################################
 
@@ -348,24 +330,6 @@ def LogISIsToLikelihoods(LogISIs, bw):
     inv_f = interp1d(norm_y,x, kind='linear', assume_sorted=True)
 
     return f,inv_f
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 class TrialInterval:
     _startTimeSamples = 0
@@ -494,10 +458,6 @@ def cachedtrainDecodingAlgorithm(sessionfile,clust,trialsPerDayLoaded,bw,cachedL
         
     return model
 
-
-
-
-
 def cachedpredictTrial(sessionfile,clust,model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
     if synthetic:
         LogISIs = synthetic_spiketrain(model)
@@ -511,7 +471,7 @@ def cachedpredictTrial(sessionfile,clust,model,trialISIs,conditions = ['target_t
         probabilities[cond].prob = np.full(len(LogISIs)+1,np.nan)
         probabilities[cond].prob[0] =  np.log10(model.conds[cond].Prior_0)
     
-    #Calculate change in W. LLR after each LogISI
+    #Calculate change in Weighted Log Likelihood ratio after each LogISI
     for cond in conditions:
         probabilities[cond].prob = np.cumsum(np.log10(np.concatenate((   [model.conds[cond].Prior_0] , model.conds[cond].Likelihood(LogISIs)   ))))
 
@@ -585,7 +545,8 @@ def cachedcalculateAccuracyOnFold(sessionfile,clust,model,cachedLogISIs,Test_X,w
     else:
         return (num_correct/num_total),(accumulated_correct/num_total),(num_empty/num_total)
 
-def calculateDecodingForSingleNeuron(session,clust,trialsPerDayLoaded,cache_directory,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'):
+def calculateDecodingForSingleNeuron(session,clust,trialsPerDayLoaded,cache_directory,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
+
     sessionfile = loadSessionCached(cache_directory,session)
     filename = generateDateString(sessionfile) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
     filename = os.path.join(output_directory,filename)
