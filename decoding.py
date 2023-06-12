@@ -1,6 +1,4 @@
 
-from .io import loadSessionCached
-
 from itertools import product 
 import numpy as np
 import pickle
@@ -14,6 +12,13 @@ from KDEpy import FFTKDE
 
 
 ###### Out-ouf-File Dependencies ############################################## 
+
+#from io.py 
+
+def loadSessionCached(destination,filename):
+    with open(os.path.join(destination,filename), 'rb') as f:
+        session = pickle.load(f)
+    return session
 
 ##from utility.py 
 def generateDateString(sessionfile):
