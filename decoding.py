@@ -69,7 +69,7 @@ def getSpikeTimes(sessionfile,clust=np.nan,starttime=np.nan,endtime=np.nan,cache
         startidx = np.greater(cachedtimes,starttime)
         cachedtimes = cachedtimes[startidx]
 
-    #Remove spikes after endtime if applicable
+    #Remove spikes after endtime if applicable 
     if not np.isnan(endtime):
         endidx = np.less(cachedtimes,endtime)
         cachedtimes = cachedtimes[endidx]
@@ -212,10 +212,9 @@ def getAllConditions(sessionfile,clust,trialsPerDayLoaded=None):
 
 def Train_Test_Split(trials,frac_test = 0.1):
     """
-    Splits a set of trails into test and train datasets
+    Splits a set of trials into test and train datasets
     trials: set of trials available in dataset
     frac_test: fraction of trails to use for test (0 for leave-one-out)
-    
     returns (train_trials,test_trials)
     """
     
@@ -625,11 +624,6 @@ def cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInt
     
     cachedTrainLogISIs = cacheLogISIs(sessionfile,clust,trainInterval)
     cachedTestLogISIs = cacheLogISIs(sessionfile,clust,testInterval)
-
-    ##eLife decoding criterion. 3 Spikes on 80% of trials
-    #numISIs = [len(trialISIs) for trialISIs in cachedLogISIs]
-    #if np.mean(np.greater_equal(numISIs,2)) < 0.8:
-    #    return np.nan,np.nan,np.nan, np.nan,np.nan,np.nan, np.nan,np.nan,np.nan, np.nan
 
     model = None
     model_c = None #Condition permutation
