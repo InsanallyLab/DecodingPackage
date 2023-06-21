@@ -581,7 +581,9 @@ def calculate_weights(sessionfile,clust,trimmed_trials_active,categories,trialsP
 def cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInterval,testInterval,reps = 1,categories='stimulus',bw=None,K_fold_num=10):
     if bw is None:
         #bwInterval = TrialInterval(0,2.5*sessionfile.meta.fs,False,False)
+        print("entering grid search")
         best_bw = sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,trainInterval)
+        print("exited grid search")
     else:
         best_bw = bw
         
