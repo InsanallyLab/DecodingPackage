@@ -30,7 +30,7 @@ file2 = "BS_85_13_AC.pickle"
 trialsPerDayLoaded = 'NO_TRIM' 
 session_file = ilep.loadSessionCached(pwd, file2)
 
-trainInterval = ilep.TrialInterval(-0.2*30000,0,False,True)
+trainInterval = ilep.TrialInterval(-0.2*300000,0,False,True)
 testInterval = ilep.TrialInterval(0,0,False,True)
 
 cluster_list = session_file.clusters.good 
@@ -42,7 +42,7 @@ start_time = time.time()  # Get the current time in seconds
 
 
 res = ilep.calculateDecodingForSingleNeuron(file2, cluster1,trialsPerDayLoaded,CACHE_DIR,OUTPUT_DIR,trainInterval,testInterval,REPETITIONS,CATEGORIES)
-print(res)
+print("The results are: ", res)
 end_time = time.time()  # Get the current time again
 execution_time = end_time - start_time
 print(f"Execution time: {execution_time} seconds")
