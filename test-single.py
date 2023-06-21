@@ -24,6 +24,12 @@ REPETITIONS = int(10)
 CATEGORIES = "stimulus"
 
 file = "TH_234_1_passive_AC.pickle"
+trialsPerDayLoaded = 'NO_TRIM' 
+session_file = ilep.loadSessionCached(pwd, file)
 
-session_file = ilep.loadSessionCached()
-res = ilep.calculateDecodingForSingleNeuron()
+
+trainInterval = ilep.TrialInterval(-0.2*30000,0,False,True)
+
+testInterval = ilep.TrialInterval(0,0,False,True)
+
+res = ilep.calculateDecodingForSingleNeuron(file,session_file.clusters.good,trialsPerDayLoaded,CACHE_DIR,OUTPUT_DIR,trainInterval,testInterval,REPETITIONS,CATEGORIES)

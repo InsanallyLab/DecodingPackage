@@ -29,6 +29,15 @@ resources/other notes:
 - style guide: https://google.github.io/styleguide/pyguide.html 
 
 
+pitt cluster: 
+
+- sbatch , crc-usage, bgfs: storage 
+
+- ssh prg101@h2p.crc.pitt.edu 
+
+
+
+
 
 
 
