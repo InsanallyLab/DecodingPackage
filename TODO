@@ -15,6 +15,7 @@ TODO:
     - Reduce Session File dependency across code base. 
     - Refactor (while True) in synthetic_spiketrain() 
     - Make an enum for categories and conditions
+    - use python3 bc sklearn has some float issue
 
 
 - scalability 1 neuron vs multiple neurons , different tpyes of input
@@ -27,7 +28,6 @@ session file structure
 resources/other notes: 
 
 - style guide: https://google.github.io/styleguide/pyguide.html 
-
 
 pitt cluster: 
 
