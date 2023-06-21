@@ -1,8 +1,11 @@
 
 import os
 import decoding as ilep 
-import tqdm 
+from tqdm import tqdm 
 import multiprocessing as mp
+
+import pandas as pd 
+
 
 # Extract current working directory (pwd)
 pwd = os.getcwd()

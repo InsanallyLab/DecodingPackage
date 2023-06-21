@@ -15,3 +15,20 @@ TODO:
     - Reduce Session File dependency across code base. 
     - Refactor (while True) in synthetic_spiketrain() 
     - Make an enum for categories and conditions
+
+
+- scalability 1 neuron vs multiple neurons , different tpyes of input
+
+session file structure 
+1: meta 
+2: 
+
+
+resources/other notes: 
+
+- style guide: https://google.github.io/styleguide/pyguide.html 
+
+
+
+
+

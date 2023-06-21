@@ -550,26 +550,20 @@ def calculateDecodingForSingleNeuron(session,clust,trialsPerDayLoaded,cache_dire
     filename = generateDateString(sessionfile) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
     filename = os.path.join(output_directory,filename)
     
-    if False:#os.path.isfile(filename):
-        with open(filename, 'rb') as f:
-            res = pickle.load(f)
-            print(f"session {session} cluster {clust} has loaded cached results {e}")
-            return res
-    else:
-        try:    
-            #a,astd,asem,wa,wastd,wasem,ca,castd,casem,pval = ilep.cachedCalculateClusterAccuracy(sessionfile,clust,reps=reps,categories='stimulus')
-            trainInterval._CalculateAvgLickDelay(sessionfile)
-            testInterval._CalculateAvgLickDelay(sessionfile)
-            res = cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInterval,testInterval,reps=reps,categories=categories)
-        except Exception as e:
-            res = generateNullResults()
-            print(f"session {session} cluster {clust} has thrown error {e}")
-            raise e
-        try:
-            with open(filename, 'wb') as f:
-                pickle.dump(res, f, protocol=pickle.HIGHEST_PROTOCOL)
-        except Exception as e:
-            print(f"Problem saving {f} to {filename}. Error: {e}")
+    try:    
+        #a,astd,asem,wa,wastd,wasem,ca,castd,casem,pval = ilep.cachedCalculateClusterAccuracy(sessionfile,clust,reps=reps,categories='stimulus')
+        trainInterval._CalculateAvgLickDelay(sessionfile)
+        testInterval._CalculateAvgLickDelay(sessionfile)
+        res = cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInterval,testInterval,reps=reps,categories=categories)
+    except Exception as e:
+        res = generateNullResults()
+        print(f"session {session} cluster {clust} has thrown error {e}")
+        raise e
+    try:
+        with open(filename, 'wb') as f:
+            pickle.dump(res, f, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception as e:
+        print(f"Problem saving {f} to {filename}. Error: {e}")
             
     print(f"finished with {generateDateString(sessionfile)} cluster {clust}")
     return res
