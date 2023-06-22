@@ -1,5 +1,7 @@
 import os
-import decoding as ilep 
+import sys 
+
+sys.path.append("code") 
 from tqdm import tqdm 
 import multiprocessing as mp
 import time 
@@ -28,7 +30,7 @@ file1 = "TH_234_1_passive_AC.pickle"
 file2 = "BS_85_13_AC.pickle" 
 
 trialsPerDayLoaded = 'NO_TRIM' 
-session_file = ilep.loadSessionCached(pwd, file2)
+session_file = ilep.loadSessionCached(CACHE_DIR, file2)
 
 trainInterval = ilep.TrialInterval(-0.2*30000,0,False,True)
 testInterval = ilep.TrialInterval(0,0,False,True)

@@ -2,10 +2,10 @@
 TODO: 
 
 - Refactor to modular code files. 
+- Handle different forms of neuron data + speed up multi neuron processing 
 - Write function specs + documentation 
 - evaluate cache policy ? 
 - Train_Test_Split() is not used anywhere ? 
-
 - High level tests for both old codebases + write some result invariants 
 - Unit Tests 
 - Integration Tests  
