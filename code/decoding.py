@@ -9,98 +9,16 @@ from scipy.interpolate import interp1d
 from sklearn.model_selection import GridSearchCV,StratifiedKFold
 from sklearn.neighbors import KernelDensity
 from KDEpy import FFTKDE
-from util import * 
+import util 
+from validation import K_fold_strat 
+import bandwidth
 
-
-################################### Validation ################################
-
-def Train_Test_Split(trials,frac_test = 0.1):
-    """
-    Splits a set of trials into test and train datasets
-    trials: set of trials available in dataset
-    frac_test: fraction of trails to use for test (0 for leave-one-out)
-    returns (train_trials,test_trials)
-    """
-    
-    N = len(trials)
-    
-    #Test set size. Must be at least one
-    N_test = int(frac_test * N)
-    if N_test < 1:
-        N_test = 1
-        
-    #Train set size. Must also be at least one.
-    N_train = N - N_test
-    if N_train < 1:
-        print('ERROR: No training data. Test fraction likely too high')
-        raise Exception
-        
-    test_idxs = np.concatenate(( [False]*N_train , [True]*N_test ))
-    test_idxs = np.random.permutation(test_idxs)
-    train_idxs = np.logical_not(test_idxs)
-    
-    test_trials = trials[test_idxs]
-    train_trials = trials[train_idxs]
-    
-    return (train_trials,test_trials)
-
-def K_fold_strat(sessionfile,trials,K):
-    trials = np.array(trials)
-    
-    X = np.ones(len(trials))
-    y = np.ones(len(trials))
-    for idx,trial in enumerate(trials):
-        if sessionfile.trials.target[trial] and sessionfile.trials.go[trial]:
-            y[idx] = 1
-        elif sessionfile.trials.target[trial] and not sessionfile.trials.go[trial]:
-            y[idx] = 2
-        elif not sessionfile.trials.target[trial] and sessionfile.trials.go[trial]:
-            y[idx] = 3
-        elif not sessionfile.trials.target[trial] and not sessionfile.trials.go[trial]:
-            y[idx] = 4
-    
-    train_test_pairs = []
-    # print(f"Data length is {len(X)}/{len(y)}, K is equal to {K}")
-    skf = StratifiedKFold(n_splits=K,shuffle=True)
-    for splitX,splitY in skf.split(X, y):
-#         plt.figure()
-#         plt.hist(y[splitY])
-        
-        train_trials = trials[splitX]
-        test_trials = trials[splitY]
-        train_test_pairs.append((train_trials,test_trials))
-    return train_test_pairs
-
-################################### Bandwidth #################################
-
-def getBWs_elife2019():
-    #RNN
-    return np.linspace(.005, 0.305, 11)
-  
-def sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,interval,folds = 50):
-    conditions = getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
-    
-    trialsToUse = conditions['all_trials'].trials
-    trialsToUse = np.random.permutation(trialsToUse)
-    trialsToUse = trialsToUse[0:int(len(trialsToUse)/2)]
-
-    LogISIs,_ = getLogISIs(sessionfile,clust,trialsToUse,interval)
-    #Ensure that we don't try to cross validate more than there are ISIs
-    folds = np.min([folds,len(LogISIs)])
-
-    LogISIs = LogISIs.reshape(-1, 1)#Required to make GridSearchCV work
-    print(f"There are {len(LogISIs)} ISIs for bw selection")
-    grid = GridSearchCV(KernelDensity(kernel='gaussian'),
-                    {'bandwidth': getBWs_elife2019()},
-                    cv=folds) # 20-fold cross-validation
-    grid.fit(LogISIs)
-    return grid.best_params_['bandwidth']
 
 ################################### Training ##################################
 
 #Trials is passed in 
 def splitByConditions(sessionfile,clust,trialsPerDayLoaded,trials,condition_names):
-    all_conditions = getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
+    all_conditions = util.getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
     
     decoding_conditions = dict()
     for cond in condition_names:
@@ -135,27 +53,13 @@ def LogISIsToLikelihoods(LogISIs, bw):
     return f,inv_f
 
 
-def getLogISIs(sessionfile,clust,trials,interval): #This code is probably redundant. Could be replaced entirely by cacheLogISIs
-    ISIs = []
-    times = []
-    for trial in trials:
-        starttime,endtime = interval._ToTimestamp(sessionfile,trial)
-        spiketimes = getSpikeTimes(sessionfile,clust=clust,starttime = starttime, endtime = endtime)
-        spiketimes = spiketimes * 1000 / sessionfile.meta.fs
 
-        ISIs.append(np.diff(spiketimes))
-        times.append(spiketimes[1:])
-
-    ISIs = np.concatenate(ISIs)
-    LogISIs = np.log10(ISIs)
-    times = np.concatenate(times)
-    return LogISIs, times
 
 def cacheLogISIs(sessionfile,clust,interval):#Include conditions
     ISIs = []
     for trial in range(sessionfile.meta.length_in_trials):
         starttime,endtime = interval._ToTimestamp(sessionfile,trial)
-        spiketimes = getSpikeTimes(sessionfile,clust=clust,starttime = starttime, endtime = endtime)
+        spiketimes = util.getSpikeTimes(sessionfile,clust=clust,starttime = starttime, endtime = endtime)
         spiketimes = spiketimes * 1000 / sessionfile.meta.fs
 
         ISIs.append(np.diff(spiketimes))
@@ -283,7 +187,7 @@ def cachedpredictTrial(sessionfile,clust,model,trialISIs,conditions = ['target_t
 
 def cachedcalculateAccuracyOnFold(sessionfile,clust,model,cachedLogISIs,Test_X,weights,conditions=['target','nontarget'],synthetic=False):
     #Note: this call to getAllConditions uses NO_TRIM all the time because it is only used to determine correctness
-    all_conditions = getAllConditions(sessionfile,clust,trialsPerDayLoaded='NO_TRIM')
+    all_conditions = util.getAllConditions(sessionfile,clust,trialsPerDayLoaded='NO_TRIM')
     
     accumulated_correct = 0
     #accumulated_total = 0 # I have changed how weighting works to be weighted by condition prevalence so this is no longer necessary
@@ -313,8 +217,8 @@ def cachedcalculateAccuracyOnFold(sessionfile,clust,model,cachedLogISIs,Test_X,w
 
 def calculateDecodingForSingleNeuron(session,clust,trialsPerDayLoaded,cache_directory,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
 
-    sessionfile = loadSessionCached(cache_directory,session)
-    filename = generateDateString(sessionfile) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
+    sessionfile = util.loadSessionCached(cache_directory,session)
+    filename = util.generateDateString(sessionfile) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
     filename = os.path.join(output_directory,filename)
     
     try:    
@@ -332,12 +236,12 @@ def calculateDecodingForSingleNeuron(session,clust,trialsPerDayLoaded,cache_dire
     except Exception as e:
         print(f"Problem saving {f} to {filename}. Error: {e}")
             
-    print(f"finished with {generateDateString(sessionfile)} cluster {clust}")
+    print(f"finished with {util.generateDateString(sessionfile)} cluster {clust}")
     return res
 
 def calculate_weights(sessionfile,clust,trimmed_trials_active,categories,trialsPerDayLoaded=None):
     num_total_trials = len(trimmed_trials_active)
-    all_conditions = getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
+    all_conditions = util.getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
 
     weights = dict()
     for cat in categories:
@@ -349,7 +253,7 @@ def cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInt
     if bw is None:
         #bwInterval = TrialInterval(0,2.5*sessionfile.meta.fs,False,False)
         print("entering grid search")
-        best_bw = sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,trainInterval)
+        best_bw = bandwidth.sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,trainInterval)
         print("exited grid search")
     else:
         best_bw = bw
@@ -400,7 +304,7 @@ def cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInt
 
     #Remove all trials that do not belong to one of the conditions in question
     included_in_conditions_mask = []
-    all_conditions = getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
+    all_conditions = util.getAllConditions(sessionfile,clust,trialsPerDayLoaded=trialsPerDayLoaded)
     for category in categories:
         included_in_conditions_mask = np.concatenate((included_in_conditions_mask,all_conditions[category].trials))
     trimmed_trials_active = trimmed_trials_active[np.isin(trimmed_trials_active,included_in_conditions_mask)]
