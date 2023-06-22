@@ -103,7 +103,6 @@ def cachedpredictTrial(sessionfile,clust,model,trialISIs,conditions = ['target_t
     for cond in conditions:
         probabilities[cond].prob /= sum_of_probs
 
-
     #No ISIs in trial. guess instead.
     if len(LogISIs) < 1:
         keys = [cond for cond in probabilities]

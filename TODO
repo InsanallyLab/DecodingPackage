@@ -37,6 +37,30 @@ pitt cluster:
 - ssh prg101@h2p.crc.pitt.edu 
 
 
+Session file usage across code: 
+
+trial interval _ToTimeStamp: 
+
+top level (CalculateDecodingForSingleNeuron): 
+| 
+    lickDelay -> sessionfile.trials.response, sessionfile.trials.go, sessionfile.trials.starts, sessionfile.trials.go 
+    cachedCalculateClusterAccuracy -> 
+    sessionfile.trim[clust].trimmed_trials, 
+        active_trials = trialsPerDayLoaded[sessionfile.meta.animal][sessionfile.meta.day_of_training]
+
+    |   Sklearn_grid_search_bw -> 
+    |   CacheLogISIs -> 
+    | getAllConditions -> 
+    | calculate_weights -> 
+    | K_fold_strat -> 
+    | cachedTrainDecodingAlgorithm -> sessionfile.meta.length_in_trials 
+        | splitbyConditions -> 
+    | cachedCalculateAccuracyonFold -> 
+        | getAllConditions -> 
+        | cachedPredictTrial ->  not used but passed in 
+    generateDateString -> 
+
+
 
 
 
