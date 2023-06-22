@@ -15,13 +15,14 @@ TODO:
     - Reduce Session File dependency across code base. 
     - Refactor (while True) in synthetic_spiketrain() 
     - Make an enum for categories and conditions
+    - incorporate trial interval class stuff inside decoding instead of making it a user facing function 
     - use python3 bc sklearn has some float issue
 
 
 - scalability 1 neuron vs multiple neurons , different tpyes of input
 
 session file structure 
-1: meta 
+1: meta
 2: 
 
 

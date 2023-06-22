@@ -11,7 +11,6 @@ def loadSessionCached(destination,filename):
         session = pickle.load(f)
     return session
 
-
 ##from utility.py 
 def generateDateString(sessionfile):
     namemodifier = 'ERROR'
