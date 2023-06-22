@@ -47,20 +47,33 @@ top level (CalculateDecodingForSingleNeuron):
     cachedCalculateClusterAccuracy -> 
     sessionfile.trim[clust].trimmed_trials, 
         active_trials = trialsPerDayLoaded[sessionfile.meta.animal][sessionfile.meta.day_of_training]
-
     |   Sklearn_grid_search_bw -> 
-    |   CacheLogISIs -> 
-    | getAllConditions -> 
+        | getAllconditions 
+        | getLogISIs -> 
+            | util.getSpikeTimes -> 
+            | interval._toTimeStamp -> 
+    |   CacheLogISIs -> sessionfile.meta.length_in_trials, sessionfile.meta.fs
+        | toTimeStamp -> 
+        | getSpikeTimes -> 
+    | getAllConditions -> sessionfile.meta.task, 
+        | getTrialSet -> sessionfile.trim[clust].trimmed_trials, sessionfile.meta.animal, sessionfile.meta.day_of_training, sessionfile.trials.target, sessionfile.trials.go, sessionfile.trials.response, sessionfile.trials.starts, sessionfile.meta.fs, sessionfile.trials.laser_simulation, sessionfile.meta.first_reversal_trial, sessionfile.meta.length_in_trials
     | calculate_weights -> 
-    | K_fold_strat -> 
+        | getAllConditions: up 
+    | K_fold_strat -> sessionfile.trials.target, sessionfile.trials.go
     | cachedTrainDecodingAlgorithm -> sessionfile.meta.length_in_trials 
-        | splitbyConditions -> 
+        | splitbyConditions -> getAllConditions only
     | cachedCalculateAccuracyonFold -> 
-        | getAllConditions -> 
+        | getAllConditions -> up 
         | cachedPredictTrial ->  not used but passed in 
     generateDateString -> 
 
 
+exhaustive list: 
+
+getspiketimes, 
+totimeStamp, 
+getTrialSet: done, 
+generateDateString
 
 
 
