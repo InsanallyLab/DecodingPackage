@@ -27,7 +27,7 @@ class Decoder:
                 break
         return np.array(LogISIs)
     
-    def cachedpredictTrial(self, sessionfile,clust,model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
+    def cachedpredictTrial(self,model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
         if synthetic:
             LogISIs = self.synthetic_spiketrain()
         else:
