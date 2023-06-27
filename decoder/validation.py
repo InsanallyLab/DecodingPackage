@@ -33,25 +33,3 @@ def Train_Test_Split(trials,frac_test = 0.1):
     
     return (train_trials,test_trials)
 
-def K_fold_strat(sessionfile,trials,K):
-    trials = np.array(trials)
-    
-    X = np.ones(len(trials))
-    y = np.ones(len(trials))
-    for idx,trial in enumerate(trials):
-        if sessionfile.trials.target[trial] and sessionfile.trials.go[trial]:
-            y[idx] = 1
-        elif sessionfile.trials.target[trial] and not sessionfile.trials.go[trial]:
-            y[idx] = 2
-        elif not sessionfile.trials.target[trial] and sessionfile.trials.go[trial]:
-            y[idx] = 3
-        elif not sessionfile.trials.target[trial] and not sessionfile.trials.go[trial]:
-            y[idx] = 4
-    
-    train_test_pairs = []
-    skf = StratifiedKFold(n_splits=K,shuffle=True)
-    for splitX,splitY in skf.split(X, y):
-        train_trials = trials[splitX]
-        test_trials = trials[splitY]
-        train_test_pairs.append((train_trials,test_trials))
-    return train_test_pairs
