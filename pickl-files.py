@@ -4,6 +4,9 @@ folder_path = "/Users/insanallylab/Desktop/priyanshi/Analysis_Cache/"
 file_name  = "LA_204_7_passive_AC.pickle"
 import pickle
 
+from decoder.io.load import Loader
+
+
 def explore_namespace(obj, indent=""):
     if isinstance(obj, dict):
         for key, value in obj.items():
@@ -33,3 +36,11 @@ explore_namespace(data.spikes)
 # print(hasattr(data.trials, "laser_stimulation"))
 
 # print(data.spikes) 
+
+loader = Loader(data)
+
+print(loader.meta)
+
+print(loader.trials) 
+
+print(loader.spikes)
