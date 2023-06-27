@@ -49,12 +49,8 @@ def K_fold_strat(sessionfile,trials,K):
             y[idx] = 4
     
     train_test_pairs = []
-    # print(f"Data length is {len(X)}/{len(y)}, K is equal to {K}")
     skf = StratifiedKFold(n_splits=K,shuffle=True)
     for splitX,splitY in skf.split(X, y):
-#         plt.figure()
-#         plt.hist(y[splitY])
-        
         train_trials = trials[splitX]
         test_trials = trials[splitY]
         train_test_pairs.append((train_trials,test_trials))

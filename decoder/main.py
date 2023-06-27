@@ -5,16 +5,15 @@ from types import SimpleNamespace
 import util 
 from interval import TrialInterval  
 import training 
-import results
 from io import * 
+from decoding import DecodingAlgorithm
 
 class Decoder: 
     def __init__(self, loader): 
         """ 
         params: loader: the result from load_session(data)
         """
-        self.model = SimpleNamespace()
-        self.data = loader #for now this is a sessionfilee loader from load.py 
+        self.loader = loader #for now this is a sessionfilee loader from load.py 
 
     def synthetic_spiketrain(self,trial_length=2500):#only model.all is required to be filled out. Units in ms
         LogISIs = []
@@ -27,54 +26,6 @@ class Decoder:
             else:
                 break
         return np.array(LogISIs)
-    
-    def cachedtrainDecodingAlgorithm(self, sessionfile,clust,trialsPerDayLoaded,bw,cachedLogISIs,Train_X,condition_names,synthetic = False):
-        self.model.conds = dict()
-        self.model.all = SimpleNamespace()
-        for cond in condition_names:
-            self.model.conds[cond] = SimpleNamespace()
-        
-        #Determine trials to use for each condition. Uses the conditions structures from
-        #ilep to increase modularity and to ensure that all code is always using the same
-        #conditions
-        decoding_conditions = training.splitByConditions(sessionfile,clust,trialsPerDayLoaded,Train_X,condition_names)
-        
-        #Handle all_trials
-        LogISIs = cachedLogISIs[Train_X]
-        LogISIs = np.concatenate(LogISIs)
-        f,inv_f = training.LogISIsToLikelihoods(LogISIs,bw)
-        self.model.all.Likelihood = f
-        self.model.all.Inv_Likelihood = inv_f
-
-        #Handle synthetic spiketrain generation
-        if synthetic:
-            cachedLogISIs = [ [] ]*sessionfile.meta.length_in_trials
-            for trial in Train_X:
-                cachedLogISIs[trial] = self.synthetic_spiketrain()
-            cachedLogISIs = np.array(cachedLogISIs,dtype='object')
-
-        #Handle individual conditions
-        LogISIs_per_trial = [len(l) for l in cachedLogISIs[Train_X]]
-        total_empty_ISI_trials = np.sum(np.equal(  LogISIs_per_trial,0  ))
-        for cond in decoding_conditions:        
-            
-            LogISIs = cachedLogISIs[decoding_conditions[cond].trials]
-            LogISIs = np.concatenate(LogISIs)
-
-            #LogISIs,_ = getLogISIs(sessionfile,clust,decoding_conditions[cond].trials)
-
-            f,inv_f = training.LogISIsToLikelihoods(LogISIs,bw) #This is a gaussian KDE
-            self.model.conds[cond].Likelihood = f
-            self.model.conds[cond].Inv_Likelihood = inv_f
-            self.model.conds[cond].Prior_0 = 1.0 / len(condition_names)
-
-            #Calculate likelihood for 0-ISI trials
-            LogISIs_per_trial = [len(l) for l in cachedLogISIs[decoding_conditions[cond].trials]]
-            numerator = np.sum(np.equal(LogISIs_per_trial,0)) + 1
-            denominator = total_empty_ISI_trials + len(condition_names)
-            self.conds[cond].Prior_empty = numerator / denominator
-            
-        return self.model
     
     def cachedpredictTrial(self, sessionfile,clust,model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
         if synthetic:
@@ -132,45 +83,40 @@ class Decoder:
             return maxCond,probs[maxidx], probabilities,False
             #return maxCond,probabilities[maxCond].prob[len(times)-1], probabilities,times
 
-    def cachedcalculateAccuracyOnFold(self, sessionfile,clust,model,cachedLogISIs,Test_X,weights,conditions=['target','nontarget'],synthetic=False):
-        #Note: this call to getAllConditions uses NO_TRIM all the time because it is only used to determine correctness
-        all_conditions = util.getAllConditions(sessionfile,clust,trialsPerDayLoaded='NO_TRIM')
-        
-        accumulated_correct = 0
-        num_correct = 0
-        num_total = 0
-        num_empty = 0
-        
-        for trial in Test_X:
-            cond,prob,_,empty_ISIs = self.cachedpredictTrial(sessionfile,clust,model,cachedLogISIs[trial],conditions=conditions,synthetic=synthetic)
-            
-            if cond is None:
-                continue
-
-            if np.isin(trial,all_conditions[cond].trials):
-                accumulated_correct += weights[cond]
-                num_correct += 1
-            num_total += 1
-
-            if empty_ISIs:
-                num_empty += 1
-            
-        if num_total <= 0:
-            return np.nan,np.nan,np.nan
-        else:
-            return (num_correct/num_total),(accumulated_correct/num_total),(num_empty/num_total)
+    def generateNullResults(self):
+        results = dict()
+        results['accuracy'] = np.nan
+        results['accuracy_std'] = np.nan
+        results['accuracy_sem'] = np.nan
+        results['weighted_accuracy'] = np.nan
+        results['weighted_accuracy_std'] = np.nan
+        results['weighted_accuracy_sem'] = np.nan
+        results['shuffled_control_accuracy'] = np.nan
+        results['shuffled_control_accuracy_std'] = np.nan
+        results['shuffled_control_accuracy_sem'] = np.nan
+        results['synthetic_control_accuracy'] = np.nan
+        results['synthetic_control_accuracy_std'] = np.nan
+        results['synthetic_control_accuracy_sem'] = np.nan
+        results['pval_shuffled_control'] = np.nan
+        results['pval_synthetic_control'] = np.nan
+        results['fraction_empty_trials'] = np.nan
+        print('null results')
+        print(results)
+        return results
         
     def calculateDecodingForSingleNeuron(self,clust,trialsPerDayLoaded,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
 
         filename = util.generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
         filename = os.path.join(output_directory,filename)
+
+        decoder = DecodingAlgorithm(self.loader, clust, trialsPerDayLoaded, trainInterval, testInterval, reps, categories)
         
         try:    
             trainInterval._CalculateAvgLickDelay(self.loader.trials)
             testInterval._CalculateAvgLickDelay(self.loader.trials)
-            res = results.cachedCalculateClusterAccuracy(self.loader,clust,trialsPerDayLoaded,trainInterval,testInterval,reps=reps,categories=categories)
+            res = decoder.cachedCalculateClusterAccuracy()
         except Exception as e:
-            res = results.generateNullResults()
+            res = self.generateNullResults()
             print(f"session cluster {clust} has thrown error {e}")
             raise e
         try:

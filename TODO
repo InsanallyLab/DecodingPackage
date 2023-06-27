@@ -9,6 +9,7 @@ TODO:
 - High level tests for both old codebases + write some result invariants 
 - Unit Tests 
 - Integration Tests  
+- implement some way to save the model, maybe use existing bayesian model on pytorch or something
 
 - Code Specific Notes: 
     - Remove SingleNameSpace() instances (change to list / dict / python class/ pandas data frame)
@@ -40,6 +41,8 @@ trial interval _ToTimeStamp:
 top level (CalculateDecodingForSingleNeuron): 
 | 
     lickDelay -> sessionfile.trials.response, sessionfile.trials.go, sessionfile.trials.starts, sessionfile.trials.go 
+
+
     cachedCalculateClusterAccuracy -> 
     sessionfile.trim[clust].trimmed_trials, 
         active_trials = trialsPerDayLoaded[sessionfile.meta.animal][sessionfile.meta.day_of_training]
@@ -63,6 +66,7 @@ top level (CalculateDecodingForSingleNeuron):
         | cachedPredictTrial ->  not used but passed in 
     generateDateString -> 
 
+getAllCOnditions and getTrialSet should be in the same file, 
 
 exhaustive list of needed info from sessionfile: 
 
