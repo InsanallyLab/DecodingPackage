@@ -38,11 +38,15 @@ cluster_list = session_file.clusters.good
 
 cluster1 = cluster_list[0] 
 
+
+print("The # of clusters is", len(cluster_list))
 start_time = time.time()  # Get the current time in seconds
 
 
 res = ilep.calculateDecodingForSingleNeuron(file2, cluster1,trialsPerDayLoaded,CACHE_DIR,OUTPUT_DIR,trainInterval,testInterval,REPETITIONS,CATEGORIES)
 print("The results are: ", res)
+
+print(len(res))
 end_time = time.time()  # Get the current time again
 execution_time = end_time - start_time
 print(f"Execution time: {execution_time} seconds")
