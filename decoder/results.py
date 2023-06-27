@@ -3,7 +3,7 @@ import bandwidth
 import util 
 from scipy.stats import sem, mannwhitneyu
 from validation import K_fold_strat 
-from decoding import * 
+from main import * 
 
 CAT_TO_COND = {  
     'stimulus':['target','nontarget'], 'response': ['go','nogo'],  'stimulus_off': ['laser_off_target','laser_off_nontarget'], 
@@ -32,9 +32,9 @@ def cacheLogISIs(sessionfile,clust,interval):#Include conditions
     LogISIs = np.array([np.log10(tISIs) for tISIs in ISIs],dtype='object')
     return LogISIs
 
-def cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInterval,testInterval,reps = 1,categories='stimulus',bw=None,K_fold_num=10):
+def cachedCalculateClusterAccuracy(loader, clust,trialsPerDayLoaded,trainInterval,testInterval,reps = 1,categories='stimulus',bw=None,K_fold_num=10):
     if bw is None:
-        best_bw = bandwidth.sklearn_grid_search_bw(sessionfile,clust,trialsPerDayLoaded,trainInterval)
+        best_bw = bandwidth.sklearn_grid_search_bw(loader,clust,trialsPerDayLoaded,trainInterval)
     else:
         best_bw = bw
         

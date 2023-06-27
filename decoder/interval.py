@@ -13,9 +13,9 @@ class TrialInterval:
         self._isStartTimeRelToResponse = startresp
         self._isEndTimeRelToResponse = endresp
 
-    def _CalculateAvgLickDelay(self,sessionfile):
-        go_responses = np.array(sessionfile.trials.response)[sessionfile.trials.go]
-        go_starts = np.array(sessionfile.trials.starts)[sessionfile.trials.go]
+    def _CalculateAvgLickDelay(self,trials):
+        go_responses = np.array(trials["response"])[trials["go"]]
+        go_starts = np.array(trials["starts"])[trials["go"]]
         self._averageLickDelay = np.nanmean(go_responses - go_starts)
 
     def _ToTimestamp(self,sessionfile,trial):

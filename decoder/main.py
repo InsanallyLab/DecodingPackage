@@ -160,18 +160,18 @@ class Decoder:
         else:
             return (num_correct/num_total),(accumulated_correct/num_total),(num_empty/num_total)
         
-    def calculateDecodingForSingleNeuron(self,clust,trialsPerDayLoaded,cache_directory,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
+    def calculateDecodingForSingleNeuron(self,clust,trialsPerDayLoaded,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
 
         filename = util.generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
         filename = os.path.join(output_directory,filename)
         
         try:    
-            trainInterval._CalculateAvgLickDelay(sessionfile)
-            testInterval._CalculateAvgLickDelay(sessionfile)
-            res = results.cachedCalculateClusterAccuracy(sessionfile,clust,trialsPerDayLoaded,trainInterval,testInterval,reps=reps,categories=categories)
+            trainInterval._CalculateAvgLickDelay(self.loader.trials)
+            testInterval._CalculateAvgLickDelay(self.loader.trials)
+            res = results.cachedCalculateClusterAccuracy(self.loader,clust,trialsPerDayLoaded,trainInterval,testInterval,reps=reps,categories=categories)
         except Exception as e:
             res = results.generateNullResults()
-            print(f"session {session} cluster {clust} has thrown error {e}")
+            print(f"session cluster {clust} has thrown error {e}")
             raise e
         try:
             with open(filename, 'wb') as f:
@@ -179,7 +179,7 @@ class Decoder:
         except Exception as e:
             print(f"Problem saving {f} to {filename}. Error: {e}")
                 
-        print(f"finished with {util.generateDateString(sessionfile)} cluster {clust}")
+        print(f"finished with {util.generateDateString(self.loader.meta)} cluster {clust}")
         return res
 
 

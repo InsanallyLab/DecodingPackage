@@ -12,20 +12,20 @@ def loadSessionCached(destination,filename):
     return session
 
 ##from utility.py 
-def generateDateString(sessionfile):
+def generateDateString(meta):
     namemodifier = 'ERROR'
-    if sessionfile.meta.task == 'CNO':
+    if meta.task == 'CNO':
         namemodifier = 'CNO'
-    elif sessionfile.meta.task in ['nonreversal','switch','reversal','second switch','second reversal']:
-        namemodifier = str(sessionfile.meta.day_of_recording)
-    elif sessionfile.meta.task in ['opto nonreversal','opto switch','opto reversal']:
-        namemodifier = str(sessionfile.meta.day_of_recording)
-    elif sessionfile.meta.task in ['tuning nonreversal','tuning switch','tuning reversal']:
-        namemodifier = str(sessionfile.meta.day_of_recording)
-    elif sessionfile.meta.task == 'thalamus tuning':
-        namemodifier = str(sessionfile.meta.day_of_recording)
+    elif meta.task in ['nonreversal','switch','reversal','second switch','second reversal']:
+        namemodifier = str(meta.day_of_recording)
+    elif meta.task in ['opto nonreversal','opto switch','opto reversal']:
+        namemodifier = str(meta.day_of_recording)
+    elif meta.task in ['tuning nonreversal','tuning switch','tuning reversal']:
+        namemodifier = str(meta.day_of_recording)
+    elif meta.task == 'thalamus tuning':
+        namemodifier = str(meta.day_of_recording)
 
-    return sessionfile.meta.animal + '_' + namemodifier + '_' + sessionfile.meta.region + '_' + str(sessionfile.meta.date).replace('/','-')
+    return meta.animal + '_' + namemodifier + '_' + meta.region + '_' + str(meta.date).replace('/','-')
 
 ###### Out-ouf-File Dependencies ############################################## 
 
@@ -102,12 +102,12 @@ def getTrialSpikes(sessionfile,trial,clust=np.nan,cachedtimes=None,startbuffer=0
 
 ##from analysis.py 
 
-def getTrialSet(sessionfile,clust,listOfTrialSets,trialsPerDayLoaded):
-    trimmed_trials_active = np.array(sessionfile.trim[clust].trimmed_trials)
+def getTrialSet(loader,clust,listOfTrialSets,trialsPerDayLoaded):
+    trimmed_trials_active = loader.trimmed_trials[clust].trimmed_trials
     if trialsPerDayLoaded == 'NO_TRIM':
         pass
     else:
-        active_trials = trialsPerDayLoaded[sessionfile.meta.animal][sessionfile.meta.day_of_training]
+        active_trials = trialsPerDayLoaded[loader.meta.animal][loader.meta.day_of_training]
         trimmed_trials_active = trimmed_trials_active[np.isin(trimmed_trials_active,active_trials)]
 
     trials = np.copy(trimmed_trials_active)
@@ -116,52 +116,52 @@ def getTrialSet(sessionfile,clust,listOfTrialSets,trialsPerDayLoaded):
         if trialSet == 'NONE':
             continue
         if trialSet == 'target':
-            trialsTrim = np.array(np.where(sessionfile.trials.target)[0])
+            trialsTrim = np.array(np.where(loader.trials["target"])[0])
         elif trialSet == 'nontarget':
-            trialsTrim = np.array(np.where(np.logical_not(sessionfile.trials.target))[0])
+            trialsTrim = np.array(np.where(np.logical_not(loader.trials["target"]))[0])
         elif trialSet == 'go':
-            trialsTrim = np.array(np.where(sessionfile.trials.go)[0])
+            trialsTrim = np.array(np.where(loader.trials["go"])[0])
         elif trialSet == 'nogo':
-            trialsTrim = np.array(np.where(np.logical_not(sessionfile.trials.go))[0])
+            trialsTrim = np.array(np.where(np.logical_not(loader.trials["go"]))[0])
         elif trialSet == 'hit':
-            trialsTrim = np.array(np.where(np.logical_and(sessionfile.trials.target,sessionfile.trials.go))[0])
+            trialsTrim = np.array(np.where(np.logical_and(loader.trials["target"],loader.trials["go"]))[0])
         elif trialSet == 'miss':
-            trialsTrim = np.array(np.where(np.logical_and(sessionfile.trials.target,np.logical_not(sessionfile.trials.go)))[0])
+            trialsTrim = np.array(np.where(np.logical_and(loader.trials["target"],np.logical_not(loader.trials["go"])))[0])
         elif trialSet == 'falarm':
-            trialsTrim = np.array(np.where(np.logical_and(np.logical_not(sessionfile.trials.target),sessionfile.trials.go))[0])
+            trialsTrim = np.array(np.where(np.logical_and(np.logical_not(loader.trials["target"]),loader.trials["go"]))[0])
         elif trialSet == 'creject':
-            trialsTrim = np.array(np.where(np.logical_and(np.logical_not(sessionfile.trials.target),np.logical_not(sessionfile.trials.go)))[0])
+            trialsTrim = np.array(np.where(np.logical_and(np.logical_not(loader.trials["target"]),np.logical_not(loader.trials["go"])))[0])
         elif trialSet == 'slow_go':
-            response_times = np.array(sessionfile.trials.response) - np.array(sessionfile.trials.starts)
-            response_times_go = response_times[sessionfile.trials.go]
+            response_times = loader.trials["response"] - loader.trials["starts"]
+            response_times_go = response_times[loader.trials["go"]]
             mean_response_time = np.mean(response_times_go)
-            slow_go_threshold = max(2*mean_response_time,0.5*sessionfile.meta.fs)
+            slow_go_threshold = max(2*mean_response_time,0.5*loader.meta.fs)
             slow_go_response = np.where(np.greater(response_times,slow_go_threshold))[0]
             trialsTrim = slow_go_response
         elif trialSet == 'fast_go':
-            response_times = np.array(sessionfile.trials.response) - np.array(sessionfile.trials.starts)
-            response_times_go = response_times[sessionfile.trials.go]
+            response_times = loader.trials["response"] - loader.trials["starts"]
+            response_times_go = response_times[loader.trials["go"]]
             mean_response_time = np.mean(response_times_go)
-            fast_go_threshold = max(2*mean_response_time,0.5*sessionfile.meta.fs)
+            fast_go_threshold = max(2*mean_response_time,0.5*loader.meta.fs)
             fast_go_response = np.where(np.less(response_times,fast_go_threshold))[0]
             fast_go_response = fast_go_response[np.isin(fast_go_response,trimmed_trials_active)]
             trialsTrim = fast_go_response
         elif trialSet == 'correct':
-            trialsHit = np.array(np.where(np.logical_and(sessionfile.trials.target,sessionfile.trials.go))[0])
-            trialsCrej = np.array(np.where(np.logical_and(np.logical_not(sessionfile.trials.target),np.logical_not(sessionfile.trials.go)))[0])
+            trialsHit = np.array(np.where(np.logical_and(loader.trials["target"],loader.trials["go"]))[0])
+            trialsCrej = np.array(np.where(np.logical_and(np.logical_not(loader.trials["target"]),np.logical_not(loader.trials["go"])))[0])
             trialsTrim = np.unique(np.concatenate((trialsHit,trialsCrej)))
         elif trialSet == 'incorrect':
-            trialsMiss = np.array(np.where(np.logical_and(sessionfile.trials.target,np.logical_not(sessionfile.trials.go)))[0])
-            trialsFal = np.array(np.where(np.logical_and(np.logical_not(sessionfile.trials.target),sessionfile.trials.go))[0])
+            trialsMiss = np.array(np.where(np.logical_and(loader.trials["target"],np.logical_not(loader.trials["go"])))[0])
+            trialsFal = np.array(np.where(np.logical_and(np.logical_not(loader.trials["target"]),loader.trials["go"]))[0])
             trialsTrim = np.unique(np.concatenate((trialsMiss,trialsFal)))
         elif trialSet == 'laser_on':
-            trialsTrim = np.array(np.where(sessionfile.trials.laser_stimulation)[0])
+            trialsTrim = np.array(np.where(loader.trials["laser_stimulation"])[0])
         elif trialSet == 'laser_off':
-            trialsTrim = np.array(np.where(np.logical_not(sessionfile.trials.laser_stimulation))[0])
+            trialsTrim = np.array(np.where(np.logical_not(loader.trials["laser_stimulation"]))[0])
         elif trialSet == 'pre_switch':
-            trialsTrim = np.array(range(sessionfile.meta.first_reversal_trial))
+            trialsTrim = np.array(range(loader.meta.first_reversal_trial))
         elif trialSet == 'post_switch':
-            trialsTrim = np.array(range(sessionfile.meta.first_reversal_trial,sessionfile.meta.length_in_trials))
+            trialsTrim = np.array(range(loader.meta.first_reversal_trial,loader.meta.length_in_trials))
         else:
             raise Exception('Unrecognized Trial Set')
         trials = trials[np.isin(trials,trialsTrim)]
@@ -178,18 +178,18 @@ def getTrialSet(sessionfile,clust,listOfTrialSets,trialsPerDayLoaded):
     condition.label = label
     return condition
 
-def getAllConditions(sessionfile,clust,trialsPerDayLoaded=None):
+def getAllConditions(meta,clust,trialsPerDayLoaded=None):
     #Some conditions currently disabled for the purposes of decoding
     trialOutcomes = ['NONE','target','nontarget','go','nogo','hit','miss','falarm','creject','slow_go','fast_go','correct','incorrect']
     laserConditions = ['NONE']
     switchConditions = ['NONE']
 
-    if sessionfile.meta.task == 'passive no behavior':
+    if meta.task == 'passive no behavior':
         trialOutcomes = ['NONE','target','nontarget']
 
-    if sessionfile.meta.task in ['opto nonreversal','opto switch','opto reversal']:
+    if meta.task in ['opto nonreversal','opto switch','opto reversal']:
         laserConditions = ['NONE','laser_on','laser_off']
-    if sessionfile.meta.task in ['switch','opto switch','tuning switch']:
+    if meta.task in ['switch','opto switch','tuning switch']:
         switchConditions = ['NONE','pre_switch','post_switch']
     
     conditions = product(switchConditions,laserConditions,trialOutcomes)

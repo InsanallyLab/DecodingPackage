@@ -39,6 +39,8 @@ class Loader:
         self.meta = Meta(sessionfile.meta)
         self.spikes = self.load_spikes(sessionfile.spikes)
 
+        self.trimmed_trials = sessionfile.trim
+
 
     def load_trials(self, trials): 
 
@@ -51,8 +53,8 @@ class Loader:
         if hasattr(trials, "laser_stimulation"): 
             trials_laser_stimulation = trials.laser_stimulation 
 
-        trials_dict = {"Trials Go": trials_go, "Trials Starts": trials_starts, "Trials Target": trials_target, "Trials Response": trials_response, 
-                       "Trials Laser Stimulation": trials_laser_stimulation} 
+        trials_dict = {"go": trials_go, "starts": trials_starts, "target": trials_target, "response": trials_response, 
+                       "laser stimulation": trials_laser_stimulation} 
         
         return pd.DataFrame(trials_dict)
 

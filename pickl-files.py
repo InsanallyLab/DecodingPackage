@@ -27,7 +27,6 @@ with open(folder_path + file_name, 'rb') as f:
 
 # Explore the pickled namespace
 #explore_namespace(data)
-explore_namespace(data.spikes)
 
 # print(type(data.trials.response[0])) 
 # print(type(data.trials.go[0]))
@@ -39,8 +38,7 @@ explore_namespace(data.spikes)
 
 loader = Loader(data)
 
-print(loader.meta)
+print(loader.trials["response"][0])
 
-print(loader.trials) 
 
-print(loader.spikes)
+print(loader.trials["go"])
