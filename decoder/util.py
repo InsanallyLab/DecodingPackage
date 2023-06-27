@@ -57,35 +57,5 @@ def getSpikeTimes(spikes,clust=np.nan,starttime=np.nan,endtime=np.nan,cachedtime
 
     return cachedtimes
 
-def getTrialSpikes(sessionfile,trial,clust=np.nan,cachedtimes=None,startbuffer=0,endbuffer=0,outunits='samples'):
-    """
-    set trial to control time span (0-indexed)
-    set clust to control what neuron id to search for
-    pass cached searches from getSpikeTimes into cachedtimes
-    to speed up sequential reads from the same neuron's
-    spike times
-    set startbuffer and endbuffer to buffer data at the start or end of a trial
-
-    returns spike times relative to trial start in units of outunits
-    """
-
-    startbuffer *= sessionfile.meta.fs
-    endbuffer *= sessionfile.meta.fs
-
-    trialstart = sessionfile.trials.starts[trial]
-    trialend = sessionfile.trials.ends[trial]
-
-    times = np.array(getSpikeTimes(sessionfile,clust=clust,starttime=(trialstart-startbuffer),endtime=(trialend+endbuffer),cachedtimes=cachedtimes),dtype='float')
-    times -= trialstart
-
-    if outunits in ['ms','milliseconds']:
-        times = times / sessionfile.meta.fs * 1000
-    elif outunits in ['s','seconds']:
-        times = times / sessionfile.meta.fs
-    elif outunits=='samples':
-        pass
-
-    return times
-
 
 
