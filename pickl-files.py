@@ -24,7 +24,7 @@ with open(folder_path + file_name, 'rb') as f:
 
 # Explore the pickled namespace
 #explore_namespace(data)
-explore_namespace(data.trials)
+explore_namespace(data.spikes)
 
 # print(type(data.trials.response[0])) 
 # print(type(data.trials.go[0]))
@@ -32,7 +32,4 @@ explore_namespace(data.trials)
 # print(type(data.trials.target[0]))
 # print(hasattr(data.trials, "laser_stimulation"))
 
-# print(data.spikes)
-
-
-
+# print(data.spikes) 

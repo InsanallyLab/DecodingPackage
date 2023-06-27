@@ -12,7 +12,7 @@ class Loader:
 
 
     def load_trials(self, trials): 
-        
+
         trials_go = np.array(trials.go) 
         trials_starts = np.array(trials.starts) 
         trials_target = np.array(trials.target) 
@@ -29,5 +29,42 @@ class Loader:
     
     def load_metadata(self, meta): 
 
+        meta_first_reversal_trial = None 
+        animal = meta.animal 
+        fs = meta.fs 
+        dor = meta.day_of_recording 
+        dot = meta.day_of_training 
+        date = meta.date 
+        length = meta.length_in_trials 
+        region = meta.region 
+        task = meta.task 
+
+        if hasattr(meta, "first_reversal_trial"): 
+            meta_first_reversal_trial = meta.first_reversal_trial 
+
+        meta_dict = { 
+            "First Reversal Trial" : meta_first_reversal_trial, 
+            "Animal" : animal, 
+            "FS" : fs, 
+            "Date of Recording": dor, 
+            "Day of Training": dot, 
+            "Date" : date, 
+            "Length In Trials": length, 
+            "Region": region, 
+            "Task" : task 
+        }
+
+        return pd.DataFrame(meta_dict)
+
 
     def load_spikes(self, spikes): 
+
+        times = spikes.times
+        clusters = spikes.clusters 
+
+        spike_dict = { 
+            "Times" : times, 
+            "Clusters": clusters
+        }
+
+        return pd.DataFrame(spike_dict)

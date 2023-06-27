@@ -12,7 +12,7 @@ TODO:
 
 - Code Specific Notes: 
     - Remove SingleNameSpace() instances (change to list / dict / python class/ pandas data frame)
-    - Reduce Session File dependency across code base. --> change to pandas df 
+    - Reduce Session File dependency across code base. --> change to df 
     - Refactor (while True) in synthetic_spiketrain() 
     - Make an enum for categories and conditions
     - incorporate trial interval class stuff inside decoding instead of making it a user facing function 
@@ -21,24 +21,17 @@ TODO:
 
 make a load session function, with separate classes for handling diff types of inputs 
 
+also make an optional manual loader so that people can load data manually (maybe integrate this with baseloader ? )
 
-- scalability 1 neuron vs multiple neurons , different tpyes of input
 
-session file structure 
-1: meta
-2: 
+- Michele's notes: scalability 1 neuron vs multiple neurons , different tpyes of input, pynapple code
 
 
 resources/other notes: 
-
 - style guide: https://google.github.io/styleguide/pyguide.html 
-
 pitt cluster: 
-
 - sbatch , crc-usage, bgfs: storage 
-
 - ssh prg101@h2p.crc.pitt.edu 
-
 
 Session file usage across code: 
 
@@ -79,18 +72,21 @@ exhaustive list of needed info from sessionfile:
 - sessionfile.trials.target: bool array 
 - sessionfile.trials.laser_stimulation --> only if trialSet is laser-on or laser-off 
 
-
 - sessionfile.trim (For trimmed trials) 
 
-- sessionfile.meta.animal 
-- sessionfile.meta.day_of_training 
-- sessionfile.meta.length_in_trials 
-- sessionfile.meta.fs 
-- sessionfile.meta.region 
-- sessionfile.meta.day_of_recording
-- sessionfile.meta.task 
-- sessionfile.meta.first_reversal_trial 
-- sessionfie.meta.date
+- sessionfile.meta.animal : str
+- sessionfile.meta.fs : int
+- sessionfile.meta.day_of_recording : int
+- sessionfile.meta.day_of_training : int
+- sessionfie.meta.date : str 
+
+- sessionfile.meta.length_in_trials : int32
+
+- sessionfile.meta.region : str 
+- sessionfile.meta.task : str 
+
+- sessionfile.meta.first_reversal_trial: optional attribute 
+
 
 - sessionfile.spikes.times 
 - sessionfile.spikes.clusters 
