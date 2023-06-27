@@ -109,11 +109,12 @@ class DecodingAlgorithm:
         trimmed_trials_active = trimmed_trials_active[np.isin(trimmed_trials_active,included_in_conditions_mask)]
 
         weights = self.calculate_weights(trimmed_trials_active)
+        """
         print(f"weights = {weights}")
-
         print(f"trimmed trials active: {trimmed_trials_active}")
         [print(f"{cat}: {all_conditions[cat].trials}") for cat in categories]
-
+        """
+       
         for rep in (range(int(self.reps/K_fold_num))):
 
             #Need to shuffle only trimmed trials without perturbing where they lie in the the total set of trials

@@ -38,7 +38,7 @@ def sklearn_grid_search_bw(loader,clust,trialsPerDayLoaded,interval,folds = 50):
     folds = np.min([folds,len(LogISIs)])
 
     LogISIs = LogISIs.reshape(-1, 1)#Required to make GridSearchCV work
-    print(f"There are {len(LogISIs)} ISIs for bw selection")
+    #print(f"There are {len(LogISIs)} ISIs for bw selection")
     grid = GridSearchCV(KernelDensity(kernel='gaussian'),
                     {'bandwidth': getBWs_elife2019()},
                     cv=folds) # 20-fold cross-validation

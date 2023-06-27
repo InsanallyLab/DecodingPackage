@@ -11,6 +11,13 @@ TODO:
 - Integration Tests  
 - implement some way to save the model, maybe use existing bayesian model on pytorch or something
 
+
+Questions/Queries: 
+
+- How can we enesure that perforance of both previous code bases is identical to the new one ? The model is non-deterministic 
+- Is there real data in other formats that I can use to test ? 
+
+
 - Code Specific Notes: 
     - Remove SingleNameSpace() instances (change to list / dict / python class/ pandas data frame)
     - Reduce Session File dependency across code base. --> change to df 

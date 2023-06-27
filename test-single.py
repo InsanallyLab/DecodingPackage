@@ -42,7 +42,6 @@ cluster1 = cluster_list[0]
 start_time = time.time()  # Get the current time in seconds
 
 res = decoder.calculateDecodingForSingleNeuron(cluster1,trialsPerDayLoaded,OUTPUT_DIR,trainInterval,testInterval,REPETITIONS,CATEGORIES)
-print(res)
 end_time = time.time()  # Get the current time again
 execution_time = end_time - start_time
 print(f"Execution time: {execution_time} seconds")
