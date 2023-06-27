@@ -32,7 +32,7 @@ class Meta:
         ]
         return "\n".join(attributes)
 
-class Loader: 
+class LoadSession: 
 
     def __init__(self, sessionfile): 
         self.trials = self.load_trials(sessionfile.trials) 
@@ -64,8 +64,8 @@ class Loader:
         clusters = spikes.clusters 
 
         spike_dict = { 
-            "Times" : times, 
-            "Clusters": clusters
+            "times" : times, 
+            "clusters": clusters
         }
 
         return pd.DataFrame(spike_dict)

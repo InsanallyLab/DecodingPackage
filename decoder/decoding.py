@@ -1,11 +1,11 @@
 
 import numpy as np 
-import bandwidth 
+from .bandwidth import sklearn_grid_search_bw
 from scipy.stats import sem, mannwhitneyu 
 from sklearn.model_selection import StratifiedKFold
-from util import * 
-from analysis import * 
-from training import * 
+from .utility import *
+from .analysis import * 
+from .training import * 
 
 
 
@@ -74,7 +74,7 @@ class DecodingAlgorithm:
 
     def cachedCalculateClusterAccuracy(self, bw = None, K_fold_num = 10): 
         if bw is None:
-            best_bw = bandwidth.sklearn_grid_search_bw(self.loader,self.clust,self.trialsPerDayLoaded,self.trainInterval)
+            best_bw = sklearn_grid_search_bw(self.loader,self.clust,self.trialsPerDayLoaded,self.trainInterval)
         else:
             best_bw = bw
             
@@ -86,8 +86,8 @@ class DecodingAlgorithm:
         synthetic_accuracy_per_fold = []
 
         fraction_empty = []
-        categories = CAT_TO_COND[categories]
-        
+        self.categories = CAT_TO_COND[self.categories]
+        categories = self.categories
         cachedTrainLogISIs = self.cacheLogISIs(self.trainInterval)
         cachedTestLogISIs = self.cacheLogISIs(self.testInterval)
 
@@ -135,12 +135,12 @@ class DecodingAlgorithm:
                 
                 #if model_c is None:
                 model_c = cachedtrainDecodingAlgorithm(self.loader,self.clust,self.trialsPerDayLoaded,best_bw,shuffled_cachedTrainLogISIs,Train_X,categories)
-                cfold_accuracy,_,_ = cachedcalculateAccuracyOnFold(self.loader,self.clust,self.model_c,shuffled_cachedTestLogISIs,Test_X,weights,conditions = categories)
+                cfold_accuracy,_,_ = cachedcalculateAccuracyOnFold(self.loader,self.clust,model_c,shuffled_cachedTestLogISIs,Test_X,weights,conditions = categories)
                 control_accuracy_per_fold.append(cfold_accuracy)
 
                 #if model_s is None:
                 model_s = cachedtrainDecodingAlgorithm(self.loader,self.clust,self.trialsPerDayLoaded,best_bw,cachedTrainLogISIs,Train_X,categories,synthetic = True)
-                sfold_accuracy,_,_ = cachedcalculateAccuracyOnFold(self.loader,self.clust,self.model_s,cachedTestLogISIs,Test_X,weights,conditions = categories, synthetic = True)
+                sfold_accuracy,_,_ = cachedcalculateAccuracyOnFold(self.loader,self.clust,model_s,cachedTestLogISIs,Test_X,weights,conditions = categories, synthetic = True)
                 synthetic_accuracy_per_fold.append(sfold_accuracy)
                 
         accuracy = np.nanmean(accuracy_per_fold)

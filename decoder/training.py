@@ -1,8 +1,8 @@
-import util 
+
 from types import SimpleNamespace 
 import numpy as np 
 from KDEpy import FFTKDE 
-from analysis import *
+from .analysis import *
 from scipy.interpolate import interp1d 
 
 
@@ -160,7 +160,7 @@ def cachedcalculateAccuracyOnFold(loader,clust,model,cachedLogISIs,Test_X,weight
     num_empty = 0
     
     for trial in Test_X:
-        cond,_,_,empty_ISIs = cachedpredictTrial(loader,clust,model,cachedLogISIs[trial],conditions=conditions,synthetic=synthetic)
+        cond,_,_,empty_ISIs = cachedpredictTrial(model,cachedLogISIs[trial],conditions=conditions,synthetic=synthetic)
         
         if cond is None:
             continue

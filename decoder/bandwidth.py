@@ -1,7 +1,8 @@
 import numpy as np 
 from sklearn.model_selection import GridSearchCV 
 from sklearn.neighbors import KernelDensity 
-import util 
+from .utility import * 
+from .analysis import * 
 
 ################################### Bandwidth #################################
 
@@ -14,7 +15,7 @@ def getLogISIs(loader,clust,trials,interval): #This code is probably redundant. 
     times = []
     for trial in trials:
         starttime,endtime = interval._ToTimestamp(loader.trials,trial)
-        spiketimes = util.getSpikeTimes(loader.spikes,clust=clust,starttime = starttime, endtime = endtime)
+        spiketimes =  getSpikeTimes(loader.spikes,clust=clust,starttime = starttime, endtime = endtime)
         spiketimes = spiketimes * 1000 / loader.meta.fs
 
         ISIs.append(np.diff(spiketimes))
@@ -26,7 +27,7 @@ def getLogISIs(loader,clust,trials,interval): #This code is probably redundant. 
     return LogISIs, times
   
 def sklearn_grid_search_bw(loader,clust,trialsPerDayLoaded,interval,folds = 50):
-    conditions = util.getAllConditions(loader,clust,trialsPerDayLoaded=trialsPerDayLoaded)
+    conditions =  getAllConditions(loader,clust,trialsPerDayLoaded=trialsPerDayLoaded)
     
     trialsToUse = conditions['all_trials'].trials
     trialsToUse = np.random.permutation(trialsToUse)

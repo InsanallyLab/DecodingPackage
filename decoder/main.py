@@ -2,11 +2,9 @@ import numpy as np
 import pickle
 import os
 from types import SimpleNamespace
-import util 
-from interval import TrialInterval  
-import training 
-from io import * 
-from decoding import DecodingAlgorithm
+from .utility import *
+from .interval import TrialInterval 
+from .decoding import DecodingAlgorithm
 
 class Decoder: 
     def __init__(self, loader): 
@@ -108,7 +106,7 @@ class Decoder:
         
     def calculateDecodingForSingleNeuron(self,clust,trialsPerDayLoaded,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
 
-        filename = util.generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
+        filename = generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
         filename = os.path.join(output_directory,filename)
 
         decoder = DecodingAlgorithm(self.loader, clust, trialsPerDayLoaded, trainInterval, testInterval, reps, categories)
@@ -127,7 +125,7 @@ class Decoder:
         except Exception as e:
             print(f"Problem saving {f} to {filename}. Error: {e}")
                 
-        print(f"finished with {util.generateDateString(self.loader.meta)} cluster {clust}")
+        print(f"finished with {generateDateString(self.loader.meta)} cluster {clust}")
         return res
 
     ################################### Validation ################################
