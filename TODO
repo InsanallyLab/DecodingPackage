@@ -11,12 +11,15 @@ TODO:
 - Integration Tests  
 
 - Code Specific Notes: 
-    - Remove SingleNameSpace() instances (change to list / dict / python class)
-    - Reduce Session File dependency across code base. 
+    - Remove SingleNameSpace() instances (change to list / dict / python class/ pandas data frame)
+    - Reduce Session File dependency across code base. --> change to pandas df 
     - Refactor (while True) in synthetic_spiketrain() 
     - Make an enum for categories and conditions
     - incorporate trial interval class stuff inside decoding instead of making it a user facing function 
     - use python3 bc sklearn has some float issue
+
+
+make a load session function, with separate classes for handling diff types of inputs 
 
 
 - scalability 1 neuron vs multiple neurons , different tpyes of input
@@ -53,10 +56,10 @@ top level (CalculateDecodingForSingleNeuron):
             | util.getSpikeTimes -> 
             | interval._toTimeStamp -> 
     |   CacheLogISIs -> sessionfile.meta.length_in_trials, sessionfile.meta.fs
-        | toTimeStamp -> 
-        | getSpikeTimes -> 
+        | toTimeStamp -> sessionfile.trials.starts, sessionfile.trials.response
+        | getSpikeTimes -> sessionfile.spikes.times, sessionfile.spikes.clusters
     | getAllConditions -> sessionfile.meta.task, 
-        | getTrialSet -> sessionfile.trim[clust].trimmed_trials, sessionfile.meta.animal, sessionfile.meta.day_of_training, sessionfile.trials.target, sessionfile.trials.go, sessionfile.trials.response, sessionfile.trials.starts, sessionfile.meta.fs, sessionfile.trials.laser_simulation, sessionfile.meta.first_reversal_trial, sessionfile.meta.length_in_trials
+        | getTrialSet -> sessionfile.trim[clust].trimmed_trials, sessionfile.meta.animal, sessionfile.meta.day_of_training, sessionfile.trials.target, sessionfile.trials.go, sessionfile.trials.response, sessionfile.trials.starts, sessionfile.meta.fs, sessionfile.trials.laser_stimulation, sessionfile.meta.first_reversal_trial, sessionfile.meta.length_in_trials
     | calculate_weights -> 
         | getAllConditions: up 
     | K_fold_strat -> sessionfile.trials.target, sessionfile.trials.go
@@ -68,13 +71,30 @@ top level (CalculateDecodingForSingleNeuron):
     generateDateString -> 
 
 
-exhaustive list: 
+exhaustive list of needed info from sessionfile: 
 
-getspiketimes, 
-totimeStamp, 
-getTrialSet: done, 
-generateDateString
+- sessionfile.trials.response: nd array of floats
+- sesionfile.trials.go: bool arr
+- sessionfile.trials.starts: float array 
+- sessionfile.trials.target: bool array 
+- sessionfile.trials.laser_stimulation --> only if trialSet is laser-on or laser-off 
 
+
+- sessionfile.trim (For trimmed trials) 
+
+- sessionfile.meta.animal 
+- sessionfile.meta.day_of_training 
+- sessionfile.meta.length_in_trials 
+- sessionfile.meta.fs 
+- sessionfile.meta.region 
+- sessionfile.meta.day_of_recording
+- sessionfile.meta.task 
+- sessionfile.meta.first_reversal_trial 
+- sessionfie.meta.date
+
+- sessionfile.spikes.times 
+- sessionfile.spikes.clusters 
+- sessionfiles.spikes.amplitudes
 
 
 
