@@ -13,11 +13,11 @@ class Decoder:
         """
         self.loader = loader #for now this is a sessionfilee loader from load.py 
 
-    def synthetic_spiketrain(self,trial_length=2500):#only model.all is required to be filled out. Units in ms
+    def synthetic_spiketrain(self, model, trial_length=2500):#only model.all is required to be filled out. Units in ms
         LogISIs = []
         ctime = 0
         while True:
-            ISI = self.model.all.Inv_Likelihood(np.random.rand())
+            ISI = model.all.Inv_Likelihood(np.random.rand())
             ctime += 10**ISI
             if ctime <= trial_length:
                 LogISIs.append(ISI)
@@ -27,7 +27,7 @@ class Decoder:
     
     def cachedpredictTrial(self,model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
         if synthetic:
-            LogISIs = self.synthetic_spiketrain()
+            LogISIs = self.synthetic_spiketrain(model)
         else:
             LogISIs = trialISIs
         
