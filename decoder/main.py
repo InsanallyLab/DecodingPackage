@@ -42,11 +42,6 @@ class Decoder:
         for cond in conditions:
             probabilities[cond].prob = np.cumsum(np.log10(np.concatenate((   [model.conds[cond].Prior_0] , model.conds[cond].Likelihood(LogISIs)   ))))
 
-        ##Calculate change in W. LLR after each LogISI
-        #for idx,logISI in enumerate(LogISIs):
-        #    for cond in conditions:
-        #        probabilities[cond].prob[idx+1] = probabilities[cond].prob[idx] + np.log10(model[cond].Likelihood.evaluate(logISI))
-
         #Exponentiate back from log so that normalization can take place
         for cond in conditions:
             probabilities[cond].prob = np.power(10,probabilities[cond].prob)
