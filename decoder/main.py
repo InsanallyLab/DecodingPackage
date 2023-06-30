@@ -96,9 +96,7 @@ class Decoder:
         print('null results')
         print(results)
         return results
-
     
-        
     def calculateDecodingForSingleNeuron(self,clust,trialsPerDayLoaded,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
 
         filename = generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'

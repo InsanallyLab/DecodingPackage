@@ -24,17 +24,18 @@ def LogISIsToLikelihoods(LogISIs, bw):
 
     return f,inv_f
 
-def synthetic_spiketrain(model,trial_length=2500):#only model.all is required to be filled out. Units in ms
+def synthetic_spiketrain(model, trial_length=2500):
     LogISIs = []
     ctime = 0
-    while True:
+
+    while ctime <= trial_length:
         ISI = model.all.Inv_Likelihood(np.random.rand())
-        ctime += 10**ISI
+        ctime += 10 ** ISI
         if ctime <= trial_length:
             LogISIs.append(ISI)
-        else:
-            break
+
     return np.array(LogISIs)
+
 
 def cachedpredictTrial(model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
     if synthetic:
