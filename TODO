@@ -3,7 +3,7 @@ TODO:
 
 - Refactor to modular code files: Done 
 - remove sessionfile dependency: Done 
-- Handle different forms of neuron data + speed up multi neuron processing: in process, need other forms of data for testing
+- Handle different forms of neuron data + speed up multi neuron processing: in process, need other forms of data for testing, make a load session function, with separate classes for handling diff types of inputs also make an optional manual loader so that people can load data manually (maybe integrate this with baseloader ? )
 - evaluate cache policy ? 
 - Unit Tests 
 - Integration Tests  
@@ -19,16 +19,12 @@ Questions/Queries:
 
 - Code Specific Notes: 
     - Remove SingleNameSpace() instances (change to list / dict / python class/ pandas data frame)
-    - Reduce Session File dependency across code base. --> change to df 
-    - Refactor (while True) in synthetic_spiketrain() 
-    - Make an enum for categories and conditions
+    - Reduce Session File dependency across code base. --> change to df + dicts : done  
+    - Refactor (while True) in synthetic_spiketrain(): done 
+    - Make an enum for categories and conditions: done
     - incorporate trial interval class stuff inside decoding instead of making it a user facing function 
     - use python3 bc sklearn has some float issue
 
-
-make a load session function, with separate classes for handling diff types of inputs 
-
-also make an optional manual loader so that people can load data manually (maybe integrate this with baseloader ? )
 
 
 - Michele's notes: scalability 1 neuron vs multiple neurons , different tpyes of input, pynapple code
