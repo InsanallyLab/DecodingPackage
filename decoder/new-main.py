@@ -5,6 +5,7 @@ from scipy.stats import sem, mannwhitneyu
 from types import SimpleNamespace 
 import numpy as np 
 from analysis import * 
+from bandwidth import * 
 
 CAT_TO_COND = {  
     'stimulus':['target','nontarget'], 'response': ['go','nogo'],  'stimulus_off': ['laser_off_target','laser_off_nontarget'], 
@@ -23,12 +24,10 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         self.reps = None
         self.categories = None
 
-
     def fit(self, Train_X, condition_names, bw, synthetic = False):
         if bw is None:
-            best_bw = sklearn_grid_search_bw(self.loader,self.clust,self.trialsPerDayLoaded,self.trainInterval)
-        else:
-            best_bw = bw 
+            #hyperparam tuning
+            bw = Bandwidth.sklearn_grid_search_bw(self.loader,self.clust,self.trialsPerDayLoaded,self.trainInterval) 
 
         model = SimpleNamespace()
         model.conds = dict()
@@ -61,7 +60,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
 
         #Handle synthetic spiketrain generation
         if synthetic:
-            cachedLogISIs = [ [] ]*loader.meta.length_in_trials
+            cachedLogISIs = [ [] ]*self.loader.meta.length_in_trials
             for trial in Train_X:
                 cachedLogISIs[trial] = synthetic_spiketrain(model)
             cachedLogISIs = np.array(cachedLogISIs,dtype='object')
