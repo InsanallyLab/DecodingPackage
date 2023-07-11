@@ -99,8 +99,10 @@ class Decoder:
     
     def calculateDecodingForSingleNeuron(self,clust,trialsPerDayLoaded,output_directory,trainInterval,testInterval,reps = 1,categories='stimulus'): 
 
-        filename = generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
-        filename = os.path.join(output_directory,filename)
+        #filename = generateDateString(self.loader.meta) + ' cluster ' + str(clust) + ' decoding cached result.pickle'
+        #filename = os.path.join(output_directory,filename)
+
+        filename = "test"
 
         decoder = DecodingAlgorithm(self.loader, clust, trialsPerDayLoaded, trainInterval, testInterval, reps, categories)
         
