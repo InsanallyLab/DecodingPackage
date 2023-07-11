@@ -16,7 +16,6 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
     def __init__(self, trialsperdayloaded):
         #params initialized in 
         self.loader = None
-        self.model = None 
         self.clust =  None
         self.trialsPerDayLoaded = None 
         self.trainInterval = None
@@ -89,14 +88,84 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
             numerator = np.sum(np.equal(LogISIs_per_trial,0)) + 1
             denominator = total_empty_ISI_trials + len(condition_names)
             model.conds[cond].Prior_empty = numerator / denominator
-
-        
-        self.model = model 
         return model
 
-    def decode(self, sessionfile, clust, cachedTestLogISIs, Test_X, weights, conditions):
-        # Perform the decoding logic here
-        accuracy, waccuracy, frac_empty = cachedcalculateAccuracyOnFold(sessionfile, clust, self.model, cachedTestLogISIs, Test_X, weights, conditions)
+    def decode_trial(self, model,trialISIs,conditions = ['target_tone','nontarget_tone'],synthetic = False):
+        if synthetic:
+            LogISIs = synthetic_spiketrain(model)
+        else:
+            LogISIs = trialISIs
+        
+        #Set up probabilities with initial values equal to priors
+        probabilities = dict()
+        for cond in conditions:
+            probabilities[cond] = SimpleNamespace()
+            probabilities[cond].prob = np.full(len(LogISIs)+1,np.nan)
+            probabilities[cond].prob[0] =  np.log10(model.conds[cond].Prior_0)
+        
+        #Calculate change in W. LLR after each LogISI
+        for cond in conditions:
+            probabilities[cond].prob = np.cumsum(np.log10(np.concatenate((   [model.conds[cond].Prior_0] , model.conds[cond].Likelihood(LogISIs)   ))))
+
+        #Exponentiate back from log so that normalization can take place
+        for cond in conditions:
+            probabilities[cond].prob = np.power(10,probabilities[cond].prob)
+        
+        #Calculate total probability sum to normalize against
+        sum_of_probs = np.zeros(len(LogISIs)+1)  
+        for cond in conditions:
+            sum_of_probs += probabilities[cond].prob
+
+        #Normalize all probabilities
+        for cond in conditions:
+            probabilities[cond].prob /= sum_of_probs
+
+        #No ISIs in trial. guess instead.
+        if len(LogISIs) < 1:
+            keys = [cond for cond in probabilities]
+            probs = [model.conds[cond].Prior_empty for cond in probabilities]
+            maxidx = np.concatenate(np.argwhere(np.equal(probs,np.max(probs))))
+            if len(maxidx) > 1:
+                maxidx = np.random.permutation(maxidx)
+            maxidx = maxidx[0]
+            maxCond = keys[maxidx]
+            return maxCond,probs[maxidx],probabilities,True
+        #ISIs were present in the trial. We can take out a proper choice by the algorithm.
+        else:
+            keys = [cond for cond in probabilities]
+            probs = [probabilities[cond].prob for cond in probabilities]
+            probs = [p[len(p)-1] for p in probs]
+            maxidx = np.argmax(probs)
+            maxCond = keys[maxidx]
+            return maxCond,probs[maxidx], probabilities,False
+
+    def decode(self, model, loader, clust, cachedTestLogISIs, Test_X, weights, conditions, synthetic=False):
+        #Note: this call to getAllConditions uses NO_TRIM all the time because it is only used to determine correctness
+        all_conditions = getAllConditions(loader,clust,trialsPerDayLoaded='NO_TRIM')
+        accumulated_correct = 0
+        num_correct = 0
+        num_total = 0
+        num_empty = 0
+        
+        for trial in Test_X:
+            cond,_,_,empty_ISIs = self.decode_trial(model,cachedTestLogISIs[trial],conditions=conditions,synthetic=synthetic)
+            
+            if cond is None:
+                continue
+
+            if np.isin(trial,all_conditions[cond].trials):
+                accumulated_correct += weights[cond]
+                num_correct += 1
+            #accumulated_total += prob
+            num_total += 1
+
+            if empty_ISIs:
+                num_empty += 1
+        if num_total <= 0: 
+
+            accuracy, waccuracy, frac_empty = np.nan, np.nan, np.nan 
+        else: 
+            accuracy, waccuracy, frac_empty = (num_correct/num_total),(accumulated_correct/num_total),(num_empty/num_total)
         return accuracy, waccuracy, frac_empty
 
     def evaluate(self, accuracy_per_fold, waccuracy_per_fold, fraction_empty, K_fold_num = 10):
@@ -141,19 +210,19 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
             for K, (Train_X, Test_X) in enumerate(folds):
 
                 #if model is None:
-                model = self.fit(self.loader,self.clust,self.trialsPerDayLoaded,best_bw,cachedTrainLogISIs,Train_X,categories)
+                model = self.fit(self.loader,self.clust,self.trialsPerDayLoaded,cachedTrainLogISIs,Train_X,categories)
                 fold_accuracy,fold_waccuracy,frac_empty = self.decode(self.loader,self.clust,model,cachedTestLogISIs,Test_X,weights,conditions = categories)
                 accuracy_per_fold.append(fold_accuracy)
                 waccuracy_per_fold.append(fold_waccuracy)
                 fraction_empty.append(frac_empty)
                 
                 #if model_c is None:
-                model_c = self.fit(self.loader,self.clust,self.trialsPerDayLoaded,best_bw,shuffled_cachedTrainLogISIs,Train_X,categories)
+                model_c = self.fit(self.loader,self.clust,self.trialsPerDayLoaded,shuffled_cachedTrainLogISIs,Train_X,categories)
                 cfold_accuracy,_,_ = self.decode(self.loader,self.clust,model_c,shuffled_cachedTestLogISIs,Test_X,weights,conditions = categories)
                 control_accuracy_per_fold.append(cfold_accuracy)
 
                 #if model_s is None:
-                model_s = self.fit(self.loader,self.clust,self.trialsPerDayLoaded,best_bw,cachedTrainLogISIs,Train_X,categories,synthetic = True)
+                model_s = self.fit(self.loader,self.clust,self.trialsPerDayLoaded,cachedTrainLogISIs,Train_X,categories,synthetic = True)
                 sfold_accuracy,_,_ = self.decode(self.loader,self.clust,model_s,cachedTestLogISIs,Test_X,weights,conditions = categories, synthetic = True)
                 synthetic_accuracy_per_fold.append(sfold_accuracy)
                 
