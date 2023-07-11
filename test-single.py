@@ -16,7 +16,9 @@ if not os.path.exists(OUTPUT_DIR):
 REPETITIONS = 10 
 CATEGORIES = "stimulus"
 
-folder_path = "/Users/insanallylab/Desktop/Priyanshi/Analysis_Cache/"
+#folder_path = "/Users/insanallylab/Desktop/Priyanshi/Analysis_Cache/"
+
+folder_path = "/Users/priyanshigarg/Downloads/Analysis_Cache" 
 file1 = "TH_234_1_passive_AC.pickle" 
 
 file2 = "BS_85_13_AC.pickle" 

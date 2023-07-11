@@ -10,7 +10,6 @@ TODO:
 - implement some way to save the model, maybe use existing bayesian model on pytorch or something
 - Write function specs + documentation 
 
-
 Questions/Queries: 
 
 - How can we enesure that perforance of both previous code bases is identical to the new one ? The model is non-deterministic 

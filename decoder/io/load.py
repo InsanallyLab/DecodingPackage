@@ -38,12 +38,9 @@ class LoadSession:
         self.trials = self.load_trials(sessionfile.trials) 
         self.meta = Meta(sessionfile.meta)
         self.spikes = self.load_spikes(sessionfile.spikes)
-
         self.trimmed_trials = sessionfile.trim
 
-
     def load_trials(self, trials): 
-
         trials_go = np.array(trials.go) 
         trials_starts = np.array(trials.starts) 
         trials_target = np.array(trials.target) 
