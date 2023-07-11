@@ -1,6 +1,10 @@
 
 TODO: 
 
+- fit(): training phase, build libraries of ISI distributions for target and non-target, infer conditional prob using KDE
+- decode(): decoding a single test trial 
+- evaluate(): cross-validation 
+----------------------------
 - Refactor to modular code files: Done 
 - remove sessionfile dependency: Done 
 - Handle different forms of neuron data + speed up multi neuron processing: in process, need other forms of data for testing, make a load session function, with separate classes for handling diff types of inputs also make an optional manual loader so that people can load data manually (maybe integrate this with baseloader ? )

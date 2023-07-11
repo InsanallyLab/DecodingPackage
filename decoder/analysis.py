@@ -1,6 +1,8 @@
 import numpy as np 
 from itertools import product 
 from types import SimpleNamespace
+from KDEpy import FFTKDE 
+from scipy.interpolate import interp1d 
 
 ##from analysis.py 
 
@@ -116,3 +118,37 @@ def splitByConditions(loader,clust,trialsPerDayLoaded,trials,condition_names):
         decoding_conditions[cond].trials = condition_trials
         
     return decoding_conditions
+
+def LogISIsToLikelihoods(LogISIs, bw): 
+    """ 
+    Estimating ISI Distribution using KDE 
+    """
+    x = np.linspace(-2,6,100)
+    y = FFTKDE(bw=bw, kernel='gaussian').fit(LogISIs, weights=None).evaluate(x)
+    
+    # Use scipy to interpolate and evaluate on arbitrary grid
+    f = interp1d(x, y, kind='linear', assume_sorted=True)
+
+    #Also want to generate an inverse CDF for sampling
+    #This should go [0,1] -> xrange
+    norm_y = np.cumsum(y) / np.sum(y)
+    norm_y[0] = 0
+    norm_y[len(norm_y)-1] = 1
+    inv_f = interp1d(norm_y,x, kind='linear', assume_sorted=True)
+
+    return f,inv_f
+
+def synthetic_spiketrain(model, trial_length=2500): 
+    """ 
+    generating synthetic spiketrains 
+    """
+    LogISIs = []
+    ctime = 0
+
+    while ctime <= trial_length:
+        ISI = model.all.Inv_Likelihood(np.random.rand())
+        ctime += 10 ** ISI
+        if ctime <= trial_length:
+            LogISIs.append(ISI)
+
+    return np.array(LogISIs)

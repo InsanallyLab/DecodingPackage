@@ -2,8 +2,9 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import cross_val_score
 from sklearn.utils import check_X_y
 from scipy.stats import sem, mannwhitneyu 
+from types import SimpleNamespace 
 import numpy as np 
-
+from analysis import * 
 
 CAT_TO_COND = {  
     'stimulus':['target','nontarget'], 'response': ['go','nogo'],  'stimulus_off': ['laser_off_target','laser_off_nontarget'], 
@@ -23,15 +24,76 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         self.categories = None
 
 
-    def fit(self, loader, clust, trialsPerDayLoaded, trainInterval, bw):
+    def fit(self, Train_X, condition_names, bw, synthetic = False):
         if bw is None:
             best_bw = sklearn_grid_search_bw(self.loader,self.clust,self.trialsPerDayLoaded,self.trainInterval)
         else:
             best_bw = bw 
 
-        # Perform the training logic here
-        self.model = cachedtrainDecodingAlgorithm(loader, clust, trialsPerDayLoaded, best_bw, cachedTrainLogISIs, Train_X, categories)
-        return self.model
+        model = SimpleNamespace()
+        model.conds = dict()
+        model.all = SimpleNamespace()
+        for cond in condition_names:
+            model.conds[cond] = SimpleNamespace()
+        
+        #Determine trials to use for each condition. Uses the conditions structures from
+        #ilep to increase modularity and to ensure that all code is always using the same
+        #conditions
+        decoding_conditions = splitByConditions(self.loader,self.clust,self.trialsPerDayLoaded,Train_X,condition_names)
+        
+        #Handle all_trials
+        #print(f"Starting model training.\nThere are {len(Train_X)} trials")
+        LogISIs = cachedLogISIs[Train_X]
+        #print(f"Starting model training.\nThere are {len(LogISIs)} trial_ISIs")
+        if len(LogISIs)<5:
+            print(f"Skipping fold. Not enough trials for ISI concatenation")
+            return None
+        LogISIs = np.concatenate(LogISIs)
+        #print(f"Starting model training.\nThere are {len(LogISIs)} ISIs")
+        #Check for feasability of this model
+        if len(LogISIs)<5:
+            print(f"Skipping fold. Not enough ISIs")
+            return None
+
+        f,inv_f = LogISIsToLikelihoods(LogISIs,bw)
+        model.all.Likelihood = f
+        model.all.Inv_Likelihood = inv_f
+
+        #Handle synthetic spiketrain generation
+        if synthetic:
+            cachedLogISIs = [ [] ]*loader.meta.length_in_trials
+            for trial in Train_X:
+                cachedLogISIs[trial] = synthetic_spiketrain(model)
+            cachedLogISIs = np.array(cachedLogISIs,dtype='object')
+
+        #Handle individual conditions
+        LogISIs_per_trial = [len(l) for l in cachedLogISIs[Train_X]]
+        total_empty_ISI_trials = np.sum(np.equal(  LogISIs_per_trial,0  ))
+        for cond in decoding_conditions:        
+            
+            LogISIs = cachedLogISIs[decoding_conditions[cond].trials]
+            LogISIs = np.concatenate(LogISIs)
+
+            if len(LogISIs)<5:
+                print(f"Skipping fold. Not enough ISIs for the {cond} condition")
+                return None
+
+            #LogISIs,_ = getLogISIs(loader,clust,decoding_conditions[cond].trials)
+
+            f,inv_f = LogISIsToLikelihoods(LogISIs,bw) #This is a gaussian KDE
+            model.conds[cond].Likelihood = f
+            model.conds[cond].Inv_Likelihood = inv_f
+            model.conds[cond].Prior_0 = 1.0 / len(condition_names)
+
+            #Calculate likelihood for 0-ISI trials
+            LogISIs_per_trial = [len(l) for l in cachedLogISIs[decoding_conditions[cond].trials]]
+            numerator = np.sum(np.equal(LogISIs_per_trial,0)) + 1
+            denominator = total_empty_ISI_trials + len(condition_names)
+            model.conds[cond].Prior_empty = numerator / denominator
+
+        
+        self.model = model 
+        return model
 
     def decode(self, sessionfile, clust, cachedTestLogISIs, Test_X, weights, conditions):
         # Perform the decoding logic here
