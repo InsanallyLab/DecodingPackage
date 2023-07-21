@@ -1,6 +1,45 @@
 
 import pandas as pd
 import numpy as np 
+import pynapple as nap 
+
+def load_session(session_type, path = None, data_dict=None):
+    """Load data from a session and return a BaseLoader object.
+
+    Args:
+        path (str, optional): The path to the session data. Default is None.
+        session_type (str, optional): The type of session data to load. 
+        Possible args are: 
+         - Neurosuite\n
+        - Phy\n
+        - Minian\n
+        - Inscopix-cnmfe\n
+        - Matlab-cnmfe\n
+        - Suite2p
+        - Custom
+        data_dict (dict, optional): A dictionary containing 'trials', 'meta', 'spikes', and optional 'trim' data. This data is non-optional for custom loader
+                                    Default is None. 
+
+    Returns:
+        BaseLoader: An instance of BaseLoader containing the loaded data.
+
+    Raises: 
+        ValueError: if session_type = "custom" and data_dict = None 
+    """
+    session_type = session_type.lower()
+    if session_type == "custom": 
+        if data_dict == None: 
+            raise ValueError("Please provide data for custom loader")
+        trials = data_dict['trials']
+        meta = data_dict['meta']
+        spikes = data_dict['spikes']
+        trim = data_dict.get('trim', None)
+        return BaseLoader(trials, meta, spikes, trim)
+    else:
+        session = nap.load_session(path, session_type) 
+
+        #TODO: figure out the different ways to extract trial and spike info from session object in pynapple
+        return BaseLoader(session.trials, session.meta, session.spikes)
 
 class Meta:
     def __init__(self, meta):
@@ -32,13 +71,13 @@ class Meta:
         ]
         return "\n".join(attributes)
 
-class LoadSession: 
+class BaseLoader: 
 
-    def __init__(self, sessionfile): 
-        self.trials = self.load_trials(sessionfile.trials) 
-        self.meta = Meta(sessionfile.meta)
-        self.spikes = self.load_spikes(sessionfile.spikes)
-        self.trimmed_trials = sessionfile.trim
+    def __init__(self, trials, meta, spikes, trim = None): 
+        self.trials = self.load_trials(trials) 
+        self.meta = Meta(meta)
+        self.spikes = self.load_spikes(spikes)
+        self.trimmed_trials = trim
 
     def load_trials(self, trials): 
         trials_go = np.array(trials.go) 
