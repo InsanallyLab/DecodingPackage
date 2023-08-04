@@ -77,7 +77,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         """ 
         
         returns model 
-        """
+        """ 
         cachedLogISIs = self.session.getLogISIs(train_interval) 
 
         model = SimpleNamespace()
@@ -89,7 +89,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         #Determine trials to use for each condition. Uses the conditions structures from
         #ilep to increase modularity and to ensure that all code is always using the same
         #conditions
-        decoding_conditions = splitByConditions(sessionfile,clust,trialsPerDayLoaded,Train_X,condition_names)
+        decoding_conditions = self.session.splitByConditions(train_x, self.conditions)
         
         LogISIs = cachedLogISIs[train_x]
         if len(LogISIs)<5:
