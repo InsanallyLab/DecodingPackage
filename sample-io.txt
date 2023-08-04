@@ -1,0 +1,32 @@
+ 
+Spike information: 
+           times  clusters
+0            179        46
+1            199        14
+2            319        46
+3            447        46
+4            448        69
+...          ...       ...
+450346  65102877        16
+450347  65103366        45
+450348  65103752        48
+450349  65103754        19
+450350  65104077         3
+
+[450351 rows x 2 columns]
+
+Trial Information: 
+        go      starts  target  response laser stimulation
+0     True     78580.0    True   85612.0              None
+1     True    191984.0    True  199337.0              None
+2     True    295578.0    True  305709.0              None
+3     True    398565.0    True  437379.0              None
+4     True    532840.0    True  557837.0              None
+..     ...         ...     ...       ...               ...
+488  False  64687593.0    True       NaN              None
+489  False  64779762.0    True       NaN              None
+490  False  64871567.0    True       NaN              None
+491  False  64963394.0    True       NaN              None
+492  False  65055577.0   False       NaN              None
+
+[493 rows x 5 columns]

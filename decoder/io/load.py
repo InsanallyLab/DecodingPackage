@@ -44,11 +44,11 @@ def load_session(session_type, path = None, data_dict=None):
 class Meta:
     def __init__(self, meta):
         self.animal = meta.animal
-        self.fs = meta.fs
+        self.fs = meta.fs # used in getting cachedLogISIs
         self.day_of_recording = meta.day_of_recording
         self.day_of_training = meta.day_of_training
         self.date = meta.date
-        self.length_in_trials = meta.length_in_trials
+        self.length_in_trials = meta.length_in_trials #used in cachedLogISIS
         self.region = meta.region
         self.task = meta.task
 

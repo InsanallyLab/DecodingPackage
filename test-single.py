@@ -4,7 +4,9 @@ import multiprocessing as mp
 import time 
 from decoder.main import * 
 from decoder.io.load import *
+from decoder.interval import * 
 import pandas as pd 
+import pickle 
 
 # Extract current working directory (pwd)
 pwd = os.getcwd()
@@ -33,17 +35,22 @@ trialsPerDayLoaded = 'NO_TRIM'
 trainInterval = TrialInterval(-0.2*30000,0,False,True)
 testInterval = TrialInterval(0,0,False,True)
 
-loader = LoadSession(session)
+data_dict = {"trials": session.trials, "meta": session.meta, "spikes": session.spikes} 
 
-decoder = Decoder(loader) 
+loader = load_session(session_type = "custom", data_dict= data_dict) 
 
-cluster_list = session.clusters.good
 
-cluster1 = cluster_list[0] 
+print(loader.spikes) 
+print(loader.trials) 
 
-start_time = time.time()  # Get the current time in seconds
 
-res = decoder.calculateDecodingForSingleNeuron(cluster1,trialsPerDayLoaded,OUTPUT_DIR,trainInterval,testInterval,REPETITIONS,CATEGORIES)
-end_time = time.time()  # Get the current time again
-execution_time = end_time - start_time
-print(f"Execution time: {execution_time} seconds")
+# cluster_list = session.clusters.good
+
+# cluster1 = cluster_list[0] 
+
+# start_time = time.time()  # Get the current time in seconds
+
+# res = decoder.calculateDecodingForSingleNeuron(cluster1,trialsPerDayLoaded,OUTPUT_DIR,trainInterval,testInterval,REPETITIONS,CATEGORIES)
+# end_time = time.time()  # Get the current time again
+# execution_time = end_time - start_time
+# print(f"Execution time: {execution_time} seconds")

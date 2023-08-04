@@ -1,8 +1,7 @@
 import numpy as np 
 from itertools import product 
 from types import SimpleNamespace
-from KDEpy import FFTKDE 
-from scipy.interpolate import interp1d 
+
 
 ##from analysis.py 
 
@@ -81,74 +80,3 @@ def getTrialSet(loader,clust,listOfTrialSets,trialsPerDayLoaded):
     condition.trials = trials
     condition.label = label
     return condition
-
-def getAllConditions(loader,clust,trialsPerDayLoaded=None):
-    #Some conditions currently disabled for the purposes of decoding
-    trialOutcomes = ['NONE','target','nontarget','go','nogo','hit','miss','falarm','creject','slow_go','fast_go','correct','incorrect']
-    laserConditions = ['NONE']
-    switchConditions = ['NONE']
-
-    if loader.meta.task == 'passive no behavior':
-        trialOutcomes = ['NONE','target','nontarget']
-
-    if loader.meta.task in ['opto nonreversal','opto switch','opto reversal']:
-        laserConditions = ['NONE','laser_on','laser_off']
-    if loader.meta.task in ['switch','opto switch','tuning switch']:
-        switchConditions = ['NONE','pre_switch','post_switch']
-    
-    conditions = product(switchConditions,laserConditions,trialOutcomes)
-
-    allconditions = dict()
-    for cond in conditions:
-        condition = getTrialSet(loader,clust,cond,trialsPerDayLoaded=trialsPerDayLoaded)
-        allconditions[condition.label] = condition
-
-    return allconditions
-
-#Trials is passed in 
-def splitByConditions(loader,clust,trialsPerDayLoaded,trials,condition_names):
-    all_conditions = getAllConditions(loader,clust,trialsPerDayLoaded=trialsPerDayLoaded)
-    
-    decoding_conditions = dict()
-    for cond in condition_names:
-        decoding_conditions[cond] = SimpleNamespace()
-    
-    for cond in decoding_conditions:
-        condition_trials = trials[np.isin(trials, all_conditions[cond].trials )]
-        decoding_conditions[cond].trials = condition_trials
-        
-    return decoding_conditions
-
-def LogISIsToLikelihoods(LogISIs, bw): 
-    """ 
-    Estimating ISI Distribution using KDE 
-    """
-    x = np.linspace(-2,6,100)
-    y = FFTKDE(bw=bw, kernel='gaussian').fit(LogISIs, weights=None).evaluate(x)
-    
-    # Use scipy to interpolate and evaluate on arbitrary grid
-    f = interp1d(x, y, kind='linear', assume_sorted=True)
-
-    #Also want to generate an inverse CDF for sampling
-    #This should go [0,1] -> xrange
-    norm_y = np.cumsum(y) / np.sum(y)
-    norm_y[0] = 0
-    norm_y[len(norm_y)-1] = 1
-    inv_f = interp1d(norm_y,x, kind='linear', assume_sorted=True)
-
-    return f,inv_f
-
-def synthetic_spiketrain(model, trial_length=2500): 
-    """ 
-    generating synthetic spiketrains 
-    """
-    LogISIs = []
-    ctime = 0
-
-    while ctime <= trial_length:
-        ISI = model.all.Inv_Likelihood(np.random.rand())
-        ctime += 10 ** ISI
-        if ctime <= trial_length:
-            LogISIs.append(ISI)
-
-    return np.array(LogISIs)

@@ -4,7 +4,7 @@ from sklearn.neighbors import KernelDensity
 from .utility import * 
 from .analysis import * 
 
-################################### Bandwidth #################################
+################################### Bandwidth ################################# (REDUNDANT CODE)
 
 class Bandwidth(): 
     @staticmethod
