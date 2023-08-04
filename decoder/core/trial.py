@@ -4,18 +4,17 @@ import numpy as np
 from  itertools import product 
 
 class Trial: 
-    def __init__(self, loader, cluster, trials_per_day_loaded, trimmed_trials_active) -> None:
+    def __init__(self, loader, cluster, trials_per_day_loaded) -> None:
         self.loader = loader
         self.cluster = cluster
         self.trials_per_day_loaded = trials_per_day_loaded
-        self.trimmed_trials_active = trimmed_trials_active 
         self.cached_conditions = {}
         self.cached_weights = None 
 
-    def getTrialSet(self, listOfTrialSets,trialsPerDayLoaded):
+    def _getTrialSet(self, listOfTrialSets,trialsPerDayLoaded):
         clust = self.cluster 
         loader = self.loader 
-        trimmed_trials_active = self.trimmed_trials_active
+        trimmed_trials_active = self.loader.trimmed_trials(self.cluster)
         if trialsPerDayLoaded == 'NO_TRIM':
             pass
         else:
@@ -90,7 +89,7 @@ class Trial:
         condition.label = label
         return condition
 
-    def getAllConditions(self, trialsPerDayLoaded=None): 
+    def get_all_conditions(self, trialsPerDayLoaded=None): 
         """ 
         computes and caches conditions according to trialsPerDayLoaded 
 
@@ -121,15 +120,15 @@ class Trial:
 
         allconditions = dict()
         for cond in conditions:
-            condition = self.getTrialSet(cond,trialsPerDayLoaded=trialsPerDayLoaded)
+            condition = self._getTrialSet(cond,trialsPerDayLoaded=trialsPerDayLoaded)
             allconditions[condition.label] = condition
 
         self.cached_conditions[cache_key] = allconditions #cache conditions for future calls 
 
         return allconditions
 
-    def splitByConditions(self, trials,conditions):
-        all_conditions = self.getAllConditions(self.trials_per_day_loaded)
+    def split_by_conditions(self, trials,conditions):
+        all_conditions = self.get_all_conditions(self.trials_per_day_loaded)
         decoding_conditions = dict()
         for cond in conditions:
             decoding_conditions[cond] = SimpleNamespace()
@@ -140,12 +139,12 @@ class Trial:
             
         return decoding_conditions
 
-    def calculateWeights(self, conditions):
+    def calculate_weights(self, conditions, num_trials):
         if self.cached_weights is not None: 
             return self.cached_weights 
         
-        num_total_trials = len(self.trimmed_trials_active)
-        all_conditions = self.getAllConditions(self.trials_per_day_loaded)
+        num_total_trials = num_trials 
+        all_conditions = self.get_all_conditions(self.trials_per_day_loaded)
 
         weights = dict()
         for cat in conditions:

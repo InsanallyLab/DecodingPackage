@@ -36,12 +36,8 @@ def K_fold_strat(sessionfile,trials,K):
             y[idx] = 4
     
     train_test_pairs = []
-    # print(f"Data length is {len(X)}/{len(y)}, K is equal to {K}")
     skf = StratifiedKFold(n_splits=K,shuffle=True)
-    for splitX,splitY in skf.split(X, y):
-#         plt.figure()
-#         plt.hist(y[splitY])
-        
+    for splitX,splitY in skf.split(X, y):        
         train_trials = trials[splitX]
         test_trials = trials[splitY]
         train_test_pairs.append((train_trials,test_trials))
@@ -299,11 +295,6 @@ def cachedpredictTrial(sessionfile,clust,model,trialISIs,conditions = ['target_t
     for cond in conditions:
         probabilities[cond].prob = np.cumsum(np.log10(np.concatenate((   [model.conds[cond].Prior_0] , model.conds[cond].Likelihood(LogISIs)   ))))
 
-    ##Calculate change in W. LLR after each LogISI
-    #for idx,logISI in enumerate(LogISIs):
-    #    for cond in conditions:
-    #        probabilities[cond].prob[idx+1] = probabilities[cond].prob[idx] + np.log10(model[cond].Likelihood.evaluate(logISI))
-
     #Exponentiate back from log so that normalization can take place
     for cond in conditions:
         probabilities[cond].prob = np.power(10,probabilities[cond].prob)
@@ -337,7 +328,6 @@ def cachedpredictTrial(sessionfile,clust,model,trialISIs,conditions = ['target_t
         maxidx = np.argmax(probs)
         maxCond = keys[maxidx]
         return maxCond,probs[maxidx], probabilities,False
-        #return maxCond,probabilities[maxCond].prob[len(times)-1], probabilities,times
 
 def cachedcalculateAccuracyOnFold(sessionfile,clust,model,cachedLogISIs,Test_X,weights,conditions=['target','nontarget'],synthetic=False):
     #Note: this call to getAllConditions uses NO_TRIM all the time because it is only used to determine correctness

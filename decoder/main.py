@@ -4,8 +4,9 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.utils import check_X_y
 from scipy.stats import sem, mannwhitneyu 
 from types import SimpleNamespace  
-from session import Session
-from spiketrain import SpikeTrain 
+from core.trial import * 
+from core.isi import * 
+from core.spiketrain import * 
 
 import numpy as np 
 import pandas as pd 
@@ -26,13 +27,15 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         self.reps = None
         self.categories = categories
         self.conditions = conditions 
-        self.session = Session(cluster, loader, trialsperdayloaded)
-        self.spike_train = SpikeTrain(self.session)
-
+        self.trial = None 
+        self.spike_train = SpikeTrain(self.loader.spikes, self.cluster) 
+        self.isi = ISI(self.loader, self.spike_train)
+        self.trial = Trial(self.loader, self.cluster, self.trialsPerDayLoaded)
+    
     def get_active_trimmed_trials(self): 
         #Get active trimmed trials
         #trimmed_trials_active = np.array(sessionfile.trim[clust].trimmed_trials) 
-        trimmed_trials_active = self.loader.trimmed_trials_active(self.cluster) #TODO: make this method in loader class
+        trimmed_trials_active = self.loader.trimmed_trials(self.cluster) #TODO: make this method in loader class
 
         if self.trialsPerDayLoaded != 'NO_TRIM':
             active_trials = self.trialsPerDayLoaded[self.loader.meta.animal][self.loader.meta.day_of_training]
@@ -40,11 +43,12 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
 
         #Remove all trials that do not belong to one of the conditions in question
         included_in_conditions_mask = []
-        all_conditions = self.session.getAllConditions(trialsPerDayLoaded=self.trialsPerDayLoaded)
+        all_conditions = self.trial.get_all_conditions(trialsPerDayLoaded=self.trialsPerDayLoaded)
         for category in self.conditions:
             included_in_conditions_mask = np.concatenate((included_in_conditions_mask,all_conditions[category].trials))
         trimmed_trials_active = trimmed_trials_active[np.isin(trimmed_trials_active,included_in_conditions_mask)]
 
+        self.trimmed_trials_active = trimmed_trials_active 
         return trimmed_trials_active 
 
     def k_fold_strat(self, trials,  n_splits): 
@@ -73,11 +77,11 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
             train_test_pairs.append((train_trials,test_trials))
         return train_test_pairs
 
-    def fit(self, train_interval, train_x, bw = None, synthetic = False): 
+    def fit(self, train_interval, train_x,bw = None, synthetic = False): 
         """ 
-        
         returns model 
         """ 
+
         cachedLogISIs = self.session.getLogISIs(train_interval) 
 
         model = SimpleNamespace()
@@ -89,7 +93,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         #Determine trials to use for each condition. Uses the conditions structures from
         #ilep to increase modularity and to ensure that all code is always using the same
         #conditions
-        decoding_conditions = self.session.splitByConditions(train_x, self.conditions)
+        decoding_conditions = self.trial.split_by_conditions(train_x, self.conditions)
         
         LogISIs = cachedLogISIs[train_x]
         if len(LogISIs)<5:
@@ -179,18 +183,17 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
 
         return pd.dataFrame(results)
 
-    
 
-    def decode_single(self, trimmed_trials_active, model, test_x, synthetic = False): 
+    def decode_single(self, model, test_x, synthetic = False): 
         """ 
         returns 
             accuracy, weighted accuracy, fraction empty 
         """
-        weights = self.session.calculateWeights(trimmed_trials_active, self.conditions) 
+        weights = self.trial.calculate_weights(self.conditions, len(self.trimmed_trials_active)) 
         
         testlogISIs = self.session.getLogISIs(self.testInterval) 
         #Note: this call to getAllConditions uses NO_TRIM all the time because it is only used to determine correctness
-        all_conditions = self.session.getAllConditions(trialsPerDayLoaded='NO_TRIM')
+        all_conditions = self.trial.get_all_conditions(trialsPerDayLoaded="NO_TRIM")
         
         accumulated_correct = 0
         #accumulated_total = 0 # I have changed how weighting works to be weighted by condition prevalence so this is no longer necessary
