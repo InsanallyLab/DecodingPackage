@@ -2,6 +2,9 @@
 import numpy as np 
 
 class SpikeTrain:
+    """ 
+    used in isi class 
+    """
     def __init__(self, spikes, cluster):
         self.spikes = spikes  
         self.cluster = cluster 

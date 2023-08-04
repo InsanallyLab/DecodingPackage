@@ -82,7 +82,13 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         returns model 
         """ 
 
-        cachedLogISIs = self.session.getLogISIs(train_interval) 
+        #TODO: figure out where to do bandwidth search 
+        # if bw is None: 
+        #     all_cond = self.trial.get_all_conditions(self.trialsPerDayLoaded)  
+        #     bw = Bandwidth
+
+
+        cachedLogISIs = self.isi.get_log_isis(train_interval)
 
         model = SimpleNamespace()
         model.conds = dict()
@@ -158,7 +164,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
             for _, (Train_X, Test_X) in enumerate(folds):
 
                 #actual model 
-                model = fit(sessionfile,clust,trialsPerDayLoaded,best_bw,cachedTrainLogISIs,Train_X,categories)
+                model = self.fit(self.trainInterval, Train_X, bw = None, synthetic=False)
                 if model is None:
                     fold_accuracy,fold_waccuracy,frac_empty = (np.nan,np.nan,np.nan)
                 else:
@@ -169,7 +175,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
                 fraction_empty.append(frac_empty)
 
                 #synthetic spiketrain model 
-                model_s = cachedtrainDecodingAlgorithm(sessionfile,clust,trialsPerDayLoaded,best_bw,cachedTrainLogISIs,Train_X,categories,synthetic = True)
+                model_s = self.fit(self.trainInterval, Train_X, bw = None, synthetic=True)
                 if model_s is None:
                     sfold_accuracy = np.nan
                 else:
@@ -191,7 +197,7 @@ class NeuralDecoder(BaseEstimator, ClassifierMixin):
         """
         weights = self.trial.calculate_weights(self.conditions, len(self.trimmed_trials_active)) 
         
-        testlogISIs = self.session.getLogISIs(self.testInterval) 
+        testlogISIs = self.isi.get_log_isis(self.testInterval) 
         #Note: this call to getAllConditions uses NO_TRIM all the time because it is only used to determine correctness
         all_conditions = self.trial.get_all_conditions(trialsPerDayLoaded="NO_TRIM")
         
