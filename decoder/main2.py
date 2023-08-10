@@ -1,4 +1,5 @@
 from core.isi import * 
+import pandas as pd 
 from types import SimpleNamespace
 
 import joblib
@@ -91,7 +92,6 @@ class NDecoder:
             print("Insufficient LogISIs data for analysis.")
             return None
 
-        
         LogISIs = np.concatenate(LogISIs) #flattens it to one array of ISIs
         
         if len(X)< self.min_isis:
@@ -128,12 +128,85 @@ class NDecoder:
         # Example: transformed_data = self.model.transform(X)
         pass
 
+    def _predict_single_trial(self, model, trialISIs):
+        """
+        Predicts the condition for a single trial using calculated probabilities.
+
+        Args:
+            model: The model containing condition parameters and priors.
+            trialISIs: List of inter-stimulus intervals for the trial.
+
+        Returns:
+            predicted condition, probability of predicted condition, flag indicating if ISIs are empty
+        """
+        LogISIs = trialISIs
+        
+        # Set up probabilities with initial values equal to priors
+        probabilities = {cond: np.full(len(LogISIs) + 1, np.nan)
+                        for cond in self.conditions}
+        
+        for cond in self.conditions:
+            # Calculate cumulative log-likelihood ratio (LLR) after each LogISI
+            probabilities[cond] = np.cumsum(
+                np.log10(np.concatenate(([model.conds[cond].Prior_0],
+                                        model.conds[cond].Likelihood(LogISIs))))
+            )
+            # Exponentiate back from log to enable normalization
+            probabilities[cond] = np.power(10, probabilities[cond])
+        
+        # Calculate total probability sum to normalize
+        sum_of_probs = np.zeros(len(LogISIs) + 1)
+        for cond in self.conditions:
+            sum_of_probs += probabilities[cond]
+        
+        # Normalize all probabilities
+        for cond in self.conditions:
+            probabilities[cond] /= sum_of_probs
+        
+        # No ISIs in trial, make a guess based on priors
+        if len(LogISIs) < 1:
+            maxCond = max(self.conditions, key=lambda cond: model.conds[cond].Prior_empty)
+            return maxCond, model.conds[maxCond].Prior_empty, True
+        # ISIs were present in the trial, predict based on normalized probabilities
+        else:
+            maxCond = max(self.conditions, key=lambda cond: probabilities[cond][-1])
+            return maxCond, probabilities[maxCond][-1], False
+
+
     def predict(self, X):
-        # Implement your prediction logic here
-        # Example: predictions = self.model.predict(X)
-        pass
+        """
+        Predict the condition for each trial in X.
+
+        Parameters:
+            X : array-like, shape (num_trials, len_of_isi)
+                LogISIs array for multiple trials.
+
+        Returns:
+            predicted_conditions : numpy array, shape (num_trials,)
+                Predicted conditions for each trial.
+
+        """
+        predicted_conditions = []
+        for trialISIs in X:
+            pred_condition, _, _, _ = self._predict_single_trial(self.model, trialISIs)
+            predicted_conditions.append(pred_condition)
+        return np.array(predicted_conditions)
 
     def predict_proba(self, X):
-        # Implement your _predict_proba logic here
-        # Example: probabilities = self.model.predict_proba(X)
-        pass
+        """
+        Predict the probabilities of each condition for each trial in X.
+
+        Parameters:
+            X : array-like, shape (num_trials, len_of_isi)
+                LogISIs array for multiple trials.
+
+        Returns:
+            probabilities : DataFrame, shape (num_trials, num_conditions)
+                Predicted probabilities for each condition for each trial.
+
+        """
+        probabilities = []
+        for trialISIs in X:
+            _, _, trial_probs, _ = self._predict_single_trial(self.model, trialISIs)
+            probabilities.append([trial_probs[cond] for cond in self.conditions])
+        return pd.DataFrame(probabilities, columns=self.conditions)
