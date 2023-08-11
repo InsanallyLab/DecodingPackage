@@ -144,36 +144,34 @@ class NDecoder:
         Returns:
             predicted condition, probability of predicted condition, flag indicating if ISIs are empty
         """
-        LogISIs = trialISIs
-        
-        # Set up probabilities with initial values equal to priors
-        probabilities = {cond: np.full(len(LogISIs) + 1, np.nan)
-                        for cond in self.conditions}
-        
-        for cond in self.conditions:
-            # Calculate cumulative log-likelihood ratio (LLR) after each LogISI
-            probabilities[cond] = np.cumsum(
-                np.log10(np.concatenate(([model.conds[cond].Prior_0],
-                                        model.conds[cond].Likelihood(LogISIs))))
-            )
-            # Exponentiate back from log to enable normalization
-            probabilities[cond] = np.power(10, probabilities[cond])
-        
-        # Calculate total probability sum to normalize
-        sum_of_probs = np.zeros(len(LogISIs) + 1)
-        for cond in self.conditions:
-            sum_of_probs += probabilities[cond]
-        
-        # Normalize all probabilities
-        for cond in self.conditions:
-            probabilities[cond] /= sum_of_probs
-        
+        LogISIs = np.array(trialISIs)
         # No ISIs in trial, make a guess based on priors
         if len(LogISIs) < 1:
-            maxCond = max(self.conditions, key=lambda cond: model.conds[cond].Prior_empty)
-            return maxCond, model.conds[maxCond].Prior_empty, True
+            maxCond = max(self.conditions, key=lambda cond: model.conds[cond].prior_empty)
+            return maxCond, model.conds[maxCond].prior_empty, True
+        
         # ISIs were present in the trial, predict based on normalized probabilities
         else:
+            # Set up probabilities with initial values equal to priors
+            probabilities = {cond: np.full(len(LogISIs) + 1, np.nan)
+                            for cond in self.conditions}
+        
+            for cond in self.conditions:
+                # Calculate cumulative log-likelihood ratio (LLR) after each LogISI
+                probabilities[cond] = np.cumsum(
+                    np.log10(np.concatenate(([model.conds[cond].prior_0],
+                                            model.conds[cond].pdf(LogISIs))))
+                )
+                # Exponentiate back from log to enable normalization
+                probabilities[cond] = np.power(10, probabilities[cond])
+        
+            # Calculate total probability sum to normalize
+            sum_of_probs = np.zeros(len(LogISIs) + 1)
+            for cond in self.conditions:
+                sum_of_probs += probabilities[cond]
+            # Normalize all probabilities
+            for cond in self.conditions:
+                probabilities[cond] /= sum_of_probs
             maxCond = max(self.conditions, key=lambda cond: probabilities[cond][-1])
             return maxCond, probabilities[maxCond][-1], False
 
