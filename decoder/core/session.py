@@ -19,6 +19,7 @@ class Session:
         self.SpikeTrain = nap.Ts(spike_time) if spike_data is None else nap.Tsd(spike_time, spike_data)
         self.IntervalSets = UniqueIntervalSet(start=start, end=end)
         self.mapped_spike_train = {}
+        self.log_isis = None
         self._cache = {}  # Dictionary to hold cached data about aligned intervals
 
     def add_interval(self, start, end):
@@ -150,18 +151,16 @@ class Session:
         # Update the SpikeTrain with recentered spike times
         self.SpikeTrain = nap.Tsd(t=np.array(all_recentered_spikes))
 
-    def transform(self, scaling_factor=1000, log_base=10):
+    def transform(self, scaling_factor=1000):
         """
-        Computes the logarithm of the inter-spike intervals (ISIs) for given time intervals and
+        Computes the logarithm (base 10) of the inter-spike intervals (ISIs) for given time intervals and
         stores them in self.log_isis. TODO: also assumes interval_alignment has been called
 
         Args:
             scaling_factor (int, optional): Factor by which to scale the spike times. Default is 1000. (in old code it was 1000/ sample_frequency)
-            log_base (int, optional): The base of the logarithm to use. Default is 10.
 
         Returns:
             numpy.ndarray: An array containing logISIs for each interval in IntervalSets.
-
         """ 
         
         logISIs = []
@@ -170,7 +169,6 @@ class Session:
         for start_time, end_time in zip(self.IntervalSets.starts.values, self.IntervalSets.ends.values):
             # Extract spike times within the interval using mapped_spike_train
             spiketimes = self.mapped_spike_train.get((start_time, end_time), [])
-            
             spiketimes_scaled = [time * scaling_factor for time in spiketimes]
             ISIs_for_interval = np.diff(spiketimes_scaled)
             logISIs_for_interval = np.log10(ISIs_for_interval) if ISIs_for_interval.size != 0 else []

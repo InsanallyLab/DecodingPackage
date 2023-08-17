@@ -1,7 +1,8 @@
 import numpy as np 
 import pandas as pd 
 import joblib
-from .core.isi import ISI 
+from KDEpy import FFTKDE 
+from scipy.interpolate import interp1d 
 
 
 class Model:
@@ -69,6 +70,34 @@ class NDecoder:
 
         return condition_subset_mapping
 
+    @staticmethod
+    def estimate_isi_distribution(log_isis, bandwidth):
+        """
+        Estimate the Inter-Spike Interval (ISI) Distribution using Kernel Density Estimation (KDE).
+
+        Args:
+            log_isis (numpy.ndarray): An array of log-transformed Inter-Spike Interval (ISI) values.
+            bandwidth (float): The bandwidth parameter for the KDE.
+
+        Returns:
+            tuple: A tuple containing two functions:
+                - A function that interpolates the estimated probability density function (PDF).
+                - A function to generate an inverse Cumulative Distribution Function (CDF) for sampling.
+        """
+        x = np.linspace(-2, 6, 100)
+        y = FFTKDE(bw=bandwidth, kernel='gaussian').fit(log_isis, weights=None).evaluate(x)
+
+        # Use scipy to interpolate and evaluate on an arbitrary grid
+        pdf_interpolator = interp1d(x, y, kind='linear', assume_sorted=True)
+
+        # Generate an inverse CDF for sampling
+        norm_y = np.cumsum(y) / np.sum(y)
+        norm_y[0] = 0
+        norm_y[-1] = 1
+        cdf_inverse_interpolator = interp1d(norm_y, x, kind='linear', assume_sorted=True)
+
+        return pdf_interpolator, cdf_inverse_interpolator
+
     def fit(self, X, y):
         """
         Fit the model to the given data.
@@ -103,7 +132,7 @@ class NDecoder:
             print("Insufficient LogISIs data after flattening for analysis.")
             return None
 
-        f,inv_f = ISI.estimate_isi_distribution(X, self.bw)
+        f,inv_f = self.estimate_isi_distribution(X, self.bw)
         self.model.set_all(f, inv_f) 
 
         #Handle individual conditions
@@ -116,7 +145,7 @@ class NDecoder:
             if len(LogISIs)< self.min_isis:
                 print(f"Skipping fold. Not enough ISIs for the {label} condition")
                 return None
-            f,inv_f = ISI.estimate_isi_distribution(LogISIs, self.bw) #This is a gaussian KDE
+            f,inv_f = self.estimate_isi_distribution(LogISIs, self.bw) #This is a gaussian KDE
             prior_0 = 1.0 / len(self.conditions)
 
             #Calculate likelihood for 0-ISI trials
