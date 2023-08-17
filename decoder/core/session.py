@@ -17,6 +17,7 @@ class Session:
         self.name = name
         self.SpikeTrain = nap.Ts(spike_time) if spike_data is None else nap.Tsd(spike_time, spike_data)
         self.IntervalSets = UniqueIntervalSet(start=start, end=end)
+        self.mapped_spike_train = {}
         self._cache = {}  # Dictionary to hold cached data about aligned intervals
 
     def add_interval(self, start, end):
@@ -63,67 +64,90 @@ class Session:
         self.IntervalSets = nap.IntervalSet(start=np.array(starts_list), end=np.array(ends_list), time_units=self.IntervalSets.time_units)
 
 
-    def interval_alignment(self, interval_set=None):
-        """
-        Align spike times according to a set of intervals. If already cached, return the cached result.
+        def interval_alignment(self, interval_set=None):
+            """
+            Align spike times according to a set of intervals and cache the result.
 
-        Parameters:
-        interval_set (object, optional): The IntervalSet used to align the object. Defaults to self.IntervalSets
+            Parameters:
+            interval_set (object, optional): The IntervalSet used to align the object. Defaults to self.IntervalSets.
 
-        Returns:
-        object: Result of the alignment
-        """
-        if interval_set is None:
-            interval_set = self.IntervalSets
-        if interval_set in self._cache:
-            return self._cache[interval_set]
-        else:
-            result = self.SpikeTrain.restrict(interval_set)
-            self._cache[interval_set] = result
-            return result
+            Returns:
+            object: Result of the alignment.
+            """
+            if interval_set is None:
+                interval_set = self.IntervalSets
+            
+            if interval_set in self._cache:
+                return self._cache[interval_set]
+            else:
+                restricted_spikes = self.SpikeTrain.restrict(interval_set)
+
+                # Optimized dictionary creation to map intervals to spike times
+                spike_pointer = 0
+                for start, end in zip(interval_set.start.values, interval_set.end.values):
+                    spikes_in_interval = []
+
+                    while spike_pointer < len(restricted_spikes) and restricted_spikes[spike_pointer] <= end:
+                        if restricted_spikes[spike_pointer] >= start:
+                            spikes_in_interval.append(restricted_spikes[spike_pointer])
+                        spike_pointer += 1
+
+                    self.mapped_spike_train[(start, end)] = spikes_in_interval
+
+                self._cache[interval_set] = restricted_spikes
+                return restricted_spikes
 
     def _ensure_single_event_per_interval(self, event_set):
-        """Ensure that each interval contains exactly one event from the provided event set.
+        """Ensure there's exactly one event per interval in the provided event set.
 
         Args:
-            event_set (EventSet): The event set containing the events to be checked.
-
-        Raises:
-            ValueError: If an interval does not contain exactly one event.
-        """
-        for start, end in zip(self.IntervalSets.starts, self.IntervalSets.ends):
-            # Counting number of events within the interval
-            events_in_interval = [time for time in event_set.get_events() if start <= time <= end]
-            
-            if len(events_in_interval) != 1:
-                raise ValueError(f"Interval ({start}, {end}) does not contain exactly one event.")
-
-    def recenter_spikes(self, event_set):
-        """Recenter spike times based on the timing of the events in the provided event set.
-
-        Args:
-            event_set (EventSet): The event set whose events will be used for recentering.
+            event_set: The event set with events to be matched with intervals.
 
         Returns:
-            nap.Ts: Recentered spike times.
+            dict: Mapping of each interval to its corresponding event timestamp.
+
+        Raises:
+            ValueError: If any interval doesn't have exactly one corresponding event.
         """
-        self._ensure_single_event_per_interval(event_set)
+        interval_event_map = {}
 
-        recentered_spikes = []
+        for start, end in self.mapped_spike_train.keys():
+            matching_events = [timestamp for timestamp in event_set.events.keys() if start <= timestamp <= end]
+            
+            if len(matching_events) != 1:
+                raise ValueError(f"Interval ({start}, {end}) does not have exactly one event in the event_set.")
+            
+            interval_event_map[(start, end)] = matching_events[0]
 
-        for start, end in zip(self.IntervalSets.starts, self.IntervalSets.ends):
-            # Getting the event time within the current interval
-            event_time = next(time for time in event_set.get_events() if start <= time <= end)
+        return interval_event_map
 
-            # Restricting spikes to the current interval
-            spikes_in_interval = self.SpikeTrain.time_slice(start, end).times
+    def recenter_spikes(self, event_set):
+        """Recenter spike times based on events and update internal structures.
 
-            # Recentering spikes based on the event time
-            recentered_spikes_interval = spikes_in_interval - event_time
+        Args:
+            event_set: The event set with events to recenter the spikes around.
 
-            recentered_spikes.extend(recentered_spikes_interval)
+        Raises:
+            ValueError: If any interval doesn't have exactly one corresponding event.
+        """
+        # Ensure that each interval has one and only one event and get mapping
+        interval_event_map = self._ensure_single_event_per_interval(event_set)
 
-        return nap.Ts(recentered_spikes)  # Returning recentered spike times
+        all_recentered_spikes = []
+
+        # Recenter spikes around the event for each interval
+        for (start, end), spikes in self.mapped_spike_train.items():
+            # Fetching the event time for the interval from the map
+            event_time = interval_event_map[(start, end)]
+
+            # Recentering using numpy for efficiency
+            recentered_spikes_for_interval = np.array(spikes) - event_time
+            
+            all_recentered_spikes.extend(recentered_spikes_for_interval.tolist())
+            self.mapped_spike_train[(start, end)] = recentered_spikes_for_interval.tolist()
+
+        # Update the SpikeTrain with recentered spike times
+        self.SpikeTrain = nap.Tsd(t=np.array(all_recentered_spikes))
 
     def transform(self, spikes, trials):
         """
