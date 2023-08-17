@@ -94,6 +94,10 @@ class Trial:
         computes and caches conditions according to trialsPerDayLoaded 
 
         trialsPerDayLoaded: None or "NO_TRIM" 
+
+        returns 
+
+        dictionary mapping labels -> 
         """
         if trialsPerDayLoaded is None: 
             trialsPerDayLoaded = self.trials_per_day_loaded 
