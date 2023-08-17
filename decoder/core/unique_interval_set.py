@@ -1,8 +1,8 @@
-import numpy as np
-import pandas as pd
-from pynapple import IntervalSet
+import pynapple as nap 
+import numpy as np  
 
-class UniqueIntervalSet(IntervalSet):
+
+class UniqueIntervalSet(nap.IntervalSet):
     """
     A subclass of pynapple.IntervalSet ensuring unique intervals.
 
@@ -26,23 +26,41 @@ class UniqueIntervalSet(IntervalSet):
             Additional parameters passed to pandas.DataFrame.
         """
         super().__init__(start=start, end=end, time_units=time_units, **kwargs)
-        if not (start == [] or end == []): 
-            self.ensure_unique_intervals()
 
-    def ensure_unique_intervals(self):
+    def add_interval(self, start, end):
         """
-        Ensures that the intervals in the set are unique.
+        Adds an interval to the unique intervals.
 
-        This method sorts the intervals based on their start times, then checks if any interval 
-        overlaps with the next. If overlaps are found, only the first interval in each set of 
-        overlapping intervals is kept.
+        Parameters:
+        start (float): Start time of the new interval.
+        end (float): End time of the new interval.
         """
-        # Sort intervals based on start times
-        self.sort_values(by='start', inplace=True)
+        # Append the new interval values to the current set of intervals
+        new_start_values = np.append(self.start.values, start)
+        new_end_values = np.append(self.end.values, end)
 
-        # Drop intervals that overlap with the next
-        mask = np.append(True, self['start'].values[1:] >= self['end'].values[:-1])
-        self.drop(self.index[~mask], inplace=True)
+        # Reinitialize the IntervalSet with the updated intervals
+        super().__init__(start=new_start_values, end=new_end_values)
 
-        # Resetting the index for consistency
-        self.reset_index(drop=True, inplace=True)
+    def delete_interval(self, start, end):
+        """
+        Delete a specified interval from the interval sets.
+
+        Args:
+            start (float): Start time of the interval to delete.
+            end (float): End time of the interval to delete.
+
+        Raises:
+            ValueError: If the specified interval does not exist in the interval sets.
+        """
+        # Identify the indices of the intervals to keep (i.e., not delete)
+        mask = ~((self.start.values == start) & (self.end.values == end))
+        if not np.any(mask):
+            raise ValueError(f"Specified interval ({start}, {end}) does not exist.")
+        
+        # Extract the intervals to keep
+        new_start_values = self.start.values[mask]
+        new_end_values = self.end.values[mask]
+
+        # Reinitialize the IntervalSet with the updated intervals
+        super().__init__(start=new_start_values, end=new_end_values)
