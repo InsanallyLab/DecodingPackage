@@ -22,7 +22,7 @@ class Session:
         self.log_isis = None
         self._cache = {}
 
-    def align_intervals(self, interval_set=None):
+    def align_to_intervals(self, interval_set=None):
         """Align spike times according to intervals and cache the result.
 
         Args:
@@ -71,7 +71,7 @@ class Session:
 
         return matched_events
 
-    def recenter_spikes(self, event_set=None):
+    def align_to_event(self, event_set=None):
         """Recenter spike times based on events.
 
         Args:
