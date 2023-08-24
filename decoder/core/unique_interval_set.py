@@ -10,12 +10,13 @@ class UniqueIntervalSet(nap.IntervalSet):
     methods for checking and enforcing this uniqueness.
     """
 
-    def __init__(self, start, end=None, time_units="s", **kwargs):
+    def __init__(self, name, start, end=None, time_units="s", **kwargs):
         """
         UniqueIntervalSet initializer.
 
         Parameters
         ----------
+        name : str, name of the interval set 
         start : numpy.ndarray, number, or pandas.DataFrame
             Start times of the intervals.
         end : numpy.ndarray or number, optional
@@ -25,6 +26,7 @@ class UniqueIntervalSet(nap.IntervalSet):
         **kwargs
             Additional parameters passed to pandas.DataFrame.
         """
+        self.name = name 
         super().__init__(start=start, end=end, time_units=time_units, **kwargs)
 
     def add_interval(self, start, end):

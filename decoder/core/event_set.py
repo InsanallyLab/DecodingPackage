@@ -7,11 +7,12 @@ class EventSet:
         events (dict): Dictionary of events, with timestamps as keys and labels as values.
     """
 
-    def __init__(self, timestamps, labels, possible_values=None, metadata=None):
+    def __init__(self, name, timestamps, labels, possible_values=None, metadata=None):
         """
         Initialize an EventSet.
 
         Args:
+            name (str): name of the event set. typically type of event e.g. lick. 
             timestamps (list): List of timestamps for events.
             labels (list): List of labels corresponding to the timestamps.
             possible_values (list, optional): List of possible labels/values for events. Defaults to None.
