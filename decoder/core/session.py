@@ -4,37 +4,71 @@ import pynapple as nap
 
 class Session:
 
-    def __init__(self, spike_times, interval_set=None, event_set=None, name=None, spike_data=None):
+    def __init__(self, spike_times, interval_sets, event_sets, name=None, spike_data=None):
         """Initialize the Session class.
 
         Args:
             spike_times (array-like): Spike times for SpikeTrain.
-            interval_set (UniqueIntervalSet, optional): Interval set for the session. Defaults to None.
-            event_set (EventSet, optional): Set of events for the session. Defaults to None.
+            interval_set (UniqueIntervalSet): Interval set for the session. Defaults to None.
+            event_set (EventSe): Set of events for the session. Defaults to None.
             name (str, optional): Session name. Defaults to None.
             spike_data (array-like, optional): Data associated with the spikes. Defaults to None.
         """
         self.name = name
         self.spike_train = nap.Tsd(spike_times, spike_data)
-        self.interval_sets = interval_set
-        self.event_set = event_set
+        self.interval_sets = {iset.name: iset for iset in interval_sets}
+        self.event_sets = {eset.name for eset in event_sets}
         self.mapped_spikes = {}
         self.log_isis = None
         self._cache = {}
 
-    def align_to_intervals(self, interval_set=None):
+    def add_interval_set(self, interval_set, override=False):
+        """Add an interval set to the session.
+
+        Args:
+            interval_set (UniqueIntervalSet): The interval set to add.
+            override (bool, optional): Whether to override if an interval set with the same name exists. Defaults to False.
+
+        Raises:
+            Warning: Raises a warning if an interval set with the same name exists and override is False.
+        """
+        if interval_set.name in self.interval_sets and not override:
+            raise Warning(f"Interval set with name {interval_set.name} already exists. Use 'override=True' to replace it.")
+        elif interval_set.name in self.interval_sets and override:
+            print(f"Warning: Overriding existing interval set with name {interval_set.name}")
+            
+        self.interval_sets[interval_set.name] = interval_set
+
+    def add_event_set(self, event_set, override=False):
+        """Add an event set to the session.
+
+        Args:
+            event_set (EventSet): The event set to add.
+            override (bool, optional): Whether to override if an event set with the same name exists. Defaults to False.
+
+        Raises:
+            Warning: Raises a warning if an event set with the same name exists and override is False.
+        """
+        if event_set.name in self.event_sets and not override:
+            raise Warning(f"Event set with name {event_set.name} already exists. Use 'override=True' to replace it.")
+        elif event_set.name in self.event_sets and override:
+            print(f"Warning: Overriding existing event set with name {event_set.name}")
+            
+        self.event_sets[event_set.name] = event_set
+
+    def align_to_intervals(self, interval_name):
         """Align spike times according to intervals and cache the result.
 
         Args:
-            interval_set (object, optional): IntervalSet to align the object. Defaults to self.interval_sets.
+            interval_name (str): name of the IntervalSet to align the object.
 
         Returns:
             object: Result of the alignment.
         """
-        interval_set = interval_set or self.interval_sets
+        interval_set = self.interval_sets[interval_name]
         
-        if interval_set in self._cache:
-            return self._cache[interval_set]
+        if interval_name in self._cache:
+            return self._cache[interval_name]
         
         restricted_spikes = self.spike_train.restrict(interval_set)
         spike_pointer = 0
@@ -46,7 +80,7 @@ class Session:
                 spike_pointer += 1
             self.mapped_spikes[(start, end)] = interval_spikes
 
-        self._cache[interval_set] = restricted_spikes
+        self._cache[interval_name] = restricted_spikes
         return restricted_spikes
 
     def _match_event_to_interval(self, event_set):
