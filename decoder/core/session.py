@@ -15,14 +15,14 @@ class Session:
             spike_data (array-like, optional): Data associated with the spikes. Defaults to None.
         """
         self.name = name
-        self.spike_train = nap.Tsd(spike_times, spike_data)
+        self.spike_train = nap.Tsd(spike_times, spike_data) #original spike train 
         self.modified_spike_trains = {} #maps (event_name, interval_name) -> Tsd object 
         self.modified_spike_trains_mapped = {} #maps (event_name, interval_name) -> (start,end) -> np array 
         self.interval_sets = {iset.name: iset for iset in interval_sets}
         self.event_sets = {eset.name for eset in event_sets}
         self.mapped_spikes = {} #maps interval_name -> start,end -> spike times
         self.log_isis = {} #maps (event_name, interval_name) -> np array of log isis
-        self.spike_interval_cache = {} #maps 
+        self.spike_interval_cache = {} #maps interval_name -> restricted spikes
 
     def add_interval_set(self, interval_set, override=False):
         """Add an interval set to the session.
@@ -58,25 +58,45 @@ class Session:
             
         self.event_sets[event_set.name] = event_set
 
-    def align_to_intervals(self, interval_name):
-        """Align spike times according to intervals and cache the result.
+    def slice_spikes_by_intervals(self, interval_name):
+        """Restricts spike data to a specified interval and caches the result.
+
+        This function restricts spike data to a given interval defined by the 
+        provided interval name. If the results have been previously computed, 
+        they are retrieved from cache to speed up the process.
 
         Args:
-            interval_name (str): name of the IntervalSet to align the object.
+            interval_name (str): The name of the IntervalSet to restrict the spikes to.
 
         Returns:
-            object: Result of the alignment.
+            list, dictionary: A list of spike times that are restricted to the specified interval, dict mapping (start,end) to spike times. 
+
+
+        Raises:
+            KeyError: If the interval_name does not exist in the interval_sets.
+
+        Altered Data Structures:
+            self.mapped_spikes: Dictionary storing spikes mapped to specific intervals.
+            self.spike_interval_cache: Cache storing spike data restricted to certain intervals.
         """
-        interval_set = self.interval_sets[interval_name]
         
+        # Fetch the desired interval set and get its padded version.
+        interval_set = self.interval_sets[interval_name]
+        interval_set = interval_set.get_padded_interval()
+        
+        # Return cached result if already computed.
         if interval_name in self.spike_interval_cache:
             return self.spike_interval_cache[interval_name]
         
+        # Restrict the spike train to the interval.
         restricted_spikes = self.spike_train.restrict(interval_set)
         spike_pointer = 0
 
+        # Initialize a storage for mapped spikes if not present.
         if interval_name not in self.mapped_spikes: 
             self.mapped_spikes[interval_name] = {}
+        
+        # Iterate through the intervals and map spikes.
         for start, end in zip(interval_set.start.values, interval_set.end.values):
             interval_spikes = []
             while spike_pointer < len(restricted_spikes) and restricted_spikes[spike_pointer] <= end:
@@ -84,9 +104,60 @@ class Session:
                     interval_spikes.append(restricted_spikes[spike_pointer])
                 spike_pointer += 1
             self.mapped_spikes[interval_name][(start, end)] = interval_spikes
-
+        
+        # Cache the result for future use.
         self.spike_interval_cache[interval_name] = restricted_spikes
-        return restricted_spikes
+        
+        return restricted_spikes, self.mapped_spikes[interval_name]
+
+
+    def time_lock_to_interval(self, interval_name, lock_point):
+        """Time-lock spikes to the start or end of intervals.
+        
+        This function adjusts spike times according to the start or end of the 
+        specified intervals, updating the mapped and modified spike trains. It treats "start" and "end" like an event_name for storing. 
+        
+        Args:
+            interval_name (str): Name of the interval set from which unpadded start and end times are retrieved.
+            lock_point (str): Either 'start' or 'end', indicating where spikes should be time-locked.
+            
+        Returns:
+            None: Alters self.modified_spike_trains_mapped and self.modified_spike_trains in-place.
+        """
+        
+        if lock_point not in ['start', 'end']:
+            raise ValueError("'lock_point' should be either 'start' or 'end'")
+        
+        unpadded_starts = self.interval_sets[interval_name].start.values
+        unpadded_ends = self.interval_sets[interval_name].end.values
+
+        # Sort the keys of mapped_spikes for this interval_name based on the start times
+        sorted_keys = sorted(self.mapped_spikes[interval_name].keys(), key=lambda x: x[0])
+
+        modified_spikes_agg = []
+
+        for idx, (start, end) in enumerate(sorted_keys):
+            
+            if lock_point == 'start':
+                time_adjustment = unpadded_starts[idx]
+            else:
+                time_adjustment = unpadded_ends[idx]
+            
+            # Adjust spike times based on the lock point
+            adjusted_spikes = [spike - time_adjustment for spike in self.mapped_spikes[interval_name][(start, end)]]
+            
+            # Store in the mapped structure
+            key = (lock_point, interval_name)
+            if key not in self.modified_spike_trains_mapped:
+                self.modified_spike_trains_mapped[key] = {}
+            self.modified_spike_trains_mapped[key][(start, end)] = np.array(adjusted_spikes)
+            
+            modified_spikes_agg.extend(adjusted_spikes)
+
+        # Convert the accumulated spikes into a Tsd object and store
+        tsd_obj = nap.Tsd(t=np.array(modified_spikes_agg))
+        self.modified_spike_trains[(lock_point, interval_name)] = tsd_obj
+
 
     def _match_event_to_interval(self, event_set, interval_name):
         """Match each interval of a specific type to a corresponding event in the provided event set.
@@ -115,7 +186,7 @@ class Session:
 
         return matched_events
 
-    def align_to_event(self, event_name, interval_name):
+    def time_lock_to_event(self, event_name, interval_name):
         """Recenter spike times based on events.
 
         Args:
@@ -240,7 +311,6 @@ class Session:
         
         self._validate_filename(filename)
         np.savez(filename, log_isis=log_isis_data)
-
 
 
     @staticmethod
