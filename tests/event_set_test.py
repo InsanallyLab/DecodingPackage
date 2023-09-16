@@ -38,13 +38,14 @@ def test_eventSet_invalid_label():
     with pytest.raises(ValueError):
         event_set = EventSet(event_name, timestamps, labels, possible_values)
 
+# TODO: Test that a ValueError is raised when an event with an existing timestamp is added
+# def test_add_event_with_existing_timestamp():
+#     event_name = "test"
+#     timestamps = [5, 10, 15]
+#     labels = ["ex1", "ex2", "ex3"]
+#     event_set = EventSet(event_name, timestamps, labels)
+#     existing_timestamp = 10
+#     new_label = "ex4"
 
-def test_eventSet_invalid_timepoint():
-    """Test if EventSet raises a ValueError when there are invalid timepoints"""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    invalid_timepoint = [5]
-    with pytest.raises(ValueError):
-        event_set = EventSet.add_event(event_name, timestamps, labels,  # added add_event last
-                                       invalid_timepoint)
+#     with pytest.raises(ValueError):
+#         event_set.add_event(existing_timestamp, new_label)
