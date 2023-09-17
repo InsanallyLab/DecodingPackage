@@ -83,3 +83,29 @@ def test_add_event_with_invalid_label():
 
 #     with pytest.raises(ValueError):
 #         event_set.add_event(existing_timestamp, new_label)
+
+
+def test_delete_event():
+    """Test if EventSet deletes valid events"""
+    event_name = "test"
+    timestamps = [5, 10, 15]
+    labels = ["ex1", "ex2", "ex3"]
+    event_set = EventSet(event_name, timestamps, labels)
+    timestamp_to_delete = 10
+
+    event_set.delete_event(timestamp_to_delete)
+
+    assert timestamp_to_delete not in event_set.events
+    assert timestamp_to_delete not in event_set.get_sorted_events()
+
+
+def test_delete_event_with_invalid_timestamp():
+    """Test if EventSet raises KeyError when deleting an event with a non-existent timestamp"""
+    event_name = "test"
+    timestamps = [5, 10, 15]
+    labels = ["ex1", "ex2", "ex3"]
+    event_set = EventSet(event_name, timestamps, labels)
+    invalid_timestamp = 50
+
+    with pytest.raises(KeyError):
+        event_set.delete_event(invalid_timestamp)
