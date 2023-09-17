@@ -109,3 +109,15 @@ def test_delete_event_with_invalid_timestamp():
 
     with pytest.raises(KeyError):
         event_set.delete_event(invalid_timestamp)
+
+
+def test_sort_events():
+    """Test if EventSet sorts events"""
+    event_name = "test"
+    timestamps = [15, 20, 5, 10]
+    labels = ["ex3", "ex4", "ex1", "ex2"]
+    event_set = EventSet(event_name, timestamps, labels)
+
+    sorted_timestamps = event_set.get_sorted_events()
+
+    assert sorted_timestamps == sorted(timestamps)
