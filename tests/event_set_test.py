@@ -2,50 +2,41 @@ import pytest
 from decoder.core.event_set import EventSet
 
 
+def create_event_set(timestamps, labels, possible_values=None):
+    event_name = "test"
+    return EventSet(event_name, timestamps, labels, possible_values)
+
+
 def test_eventSet_initialization():
     """Test if EventSet initializes correctly with expected data"""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    event_set = EventSet(event_name, timestamps, labels)
+    event_set = create_event_set([5, 10, 15], ["ex1", "ex2", "ex3"])
     assert len(event_set.events) == 3
 
 
 def test_eventSet_timestamps_shorter_than_labels():
     """Test if EventSet raises a ValueError when there are less timestamps than labels"""
-    event_name = "test"
-    timestamps = [5, 10]
-    labels = ["ex1", "ex2", "ex3"]
     with pytest.raises(ValueError):
-        event_set = EventSet(event_name, timestamps, labels)
+        event_set = create_event_set([5, 10], ["ex1", "ex2", "ex3"])
 
 
 def test_eventSet_labels_shorter_than_timestamps():
     """Test if EventSet raises a ValueError when there are less labels than timestamps"""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2"]
     with pytest.raises(ValueError):
-        event_set = EventSet(event_name, timestamps, labels)
+        event_set = create_event_set([5, 10, 15], ["ex1", "ex2"])
 
 
 def test_eventSet_invalid_label():
     """Test if EventSet raises a ValueError when there are invalid labels (i.e. labels not in possible values)"""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    possible_values = ["A", "B", "C"]
     with pytest.raises(ValueError):
-        event_set = EventSet(event_name, timestamps, labels, possible_values)
+        event_set = create_event_set(
+            [5, 10, 15], ["ex1", "ex2", "ex3"], ["A", "B", "C"])
 
 
 def test_add_valid_event():
     """Test if EventSet adds valid events"""
-    event_name = "test"
+    event_set = create_event_set(
+        [5, 10, 15], ["ex1", "ex2", "ex3"], ["ex1", "ex2", "ex3", "ex4"])
     timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    event_set = EventSet(event_name, timestamps, labels,
-                         possible_values=["ex1", "ex2", "ex3", "ex4"])
     new_timestamp = 20
     new_label = "ex4"
 
@@ -58,11 +49,9 @@ def test_add_valid_event():
 
 def test_add_event_with_invalid_label():
     """Test if EventSet raises ValueError when adding an event with an invalid label."""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    event_set = EventSet(event_name, timestamps, labels,
-                         possible_values=["ex1", "ex2", "ex3"])
+    event_set = create_event_set(
+        [5, 10, 15], ["ex1", "ex2", "ex3"], ["ex1", "ex2", "ex3"])
+
     new_timestamp = 20
     new_label = "ex4"
 
@@ -87,10 +76,7 @@ def test_add_event_with_invalid_label():
 
 def test_delete_event():
     """Test if EventSet deletes valid events"""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    event_set = EventSet(event_name, timestamps, labels)
+    event_set = create_event_set([5, 10, 15], ["ex1", "ex2", "ex3"])
     timestamp_to_delete = 10
 
     event_set.delete_event(timestamp_to_delete)
@@ -101,10 +87,7 @@ def test_delete_event():
 
 def test_delete_event_with_invalid_timestamp():
     """Test if EventSet raises KeyError when deleting an event with a non-existent timestamp"""
-    event_name = "test"
-    timestamps = [5, 10, 15]
-    labels = ["ex1", "ex2", "ex3"]
-    event_set = EventSet(event_name, timestamps, labels)
+    event_set = create_event_set([5, 10, 15], ["ex1", "ex2", "ex3"])
     invalid_timestamp = 50
 
     with pytest.raises(KeyError):
@@ -113,10 +96,8 @@ def test_delete_event_with_invalid_timestamp():
 
 def test_sort_events():
     """Test if EventSet sorts events"""
-    event_name = "test"
     timestamps = [15, 20, 5, 10]
-    labels = ["ex3", "ex4", "ex1", "ex2"]
-    event_set = EventSet(event_name, timestamps, labels)
+    event_set = create_event_set([15, 20, 5, 10], ["ex3", "ex4", "ex1", "ex2"])
 
     sorted_timestamps = event_set.get_sorted_events()
 
