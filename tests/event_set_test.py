@@ -59,19 +59,15 @@ def test_add_event_with_invalid_label():
         event_set.add_event(new_timestamp, new_label)
 
 
-# TODO: Test that a ValueError is raised when an event with an existing timestamp is added
-# def test_add_event_with_existing_timestamp():
-#     """Test if EventSet raises ValueError when adding an event with an invalid timestamp."""
-#     event_name = "test"
-#     timestamps = [5, 10, 15]
-#     labels = ["ex1", "ex2", "ex3"]
-#     event_set = EventSet(event_name, timestamps, labels)
+def test_add_event_with_existing_timestamp():
+    """Test if EventSet raises ValueError when adding an event with an invalid timestamp."""
+    event_set = create_event_set([5, 10, 15], ["ex1", "ex2", "ex3"])
 
-#     existing_timestamp = 100
-#     new_label = "ex4"
+    existing_timestamp = 10
+    label = "ex3"
 
-#     with pytest.raises(ValueError):
-#         event_set.add_event(existing_timestamp, new_label)
+    with pytest.raises(ValueError):
+        event_set.add_event(existing_timestamp, label)
 
 
 def test_delete_event():
