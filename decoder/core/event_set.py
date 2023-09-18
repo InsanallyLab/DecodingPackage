@@ -25,8 +25,7 @@ class EventSet:
             raise ValueError("Length of timestamps and labels must match.")
 
         if possible_values and not all(label in possible_values for label in labels):
-            raise ValueError(
-                "Some labels are not in the possible values list.")
+            raise ValueError("Some labels are not in the possible values list.")
 
         self.possible_values = possible_values if possible_values else list(set(labels))
         self.metadata = metadata if metadata else {}
