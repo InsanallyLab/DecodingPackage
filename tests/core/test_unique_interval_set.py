@@ -8,7 +8,7 @@ def test_initialization_without_overlaps():
     start_times = [0, 10, 20]
     end_times = [5, 15, 25]
     
-    uis = UniqueIntervalSet(start=start_times, end=end_times)
+    uis = UniqueIntervalSet(name="test", start=start_times, end=end_times)
     
     assert len(uis) == 3, "Unexpected number of intervals in UniqueIntervalSet."
 
@@ -28,12 +28,12 @@ def test_initialization_with_overlaps():
 
 def test_empty_initialization():
     """Test if UniqueIntervalSet initializes correctly with empty start and end lists."""
-    uis = UniqueIntervalSet(start=[], end=[])    
+    uis = UniqueIntervalSet(name="test", start=[], end=[])    
     assert uis.empty, "UniqueIntervalSet should be empty."
 
 def test_mismatched_start_end_lengths():
     """Test if ValueError is raised when start and end lists are of different lengths."""
     with pytest.raises(RuntimeError):
-        uis = UniqueIntervalSet(start=[0, 10], end=[5])
+        uis = UniqueIntervalSet(name="test", start=[0, 10], end=[5])
 
 # Add more tests as necessary
