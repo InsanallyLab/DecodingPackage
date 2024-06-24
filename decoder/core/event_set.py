@@ -2,7 +2,7 @@ class EventSet:
     """Represents a collection of events in a session.
 
     Attributes:
-        possible_values (list): List of possible labels/values for events.
+        possible_values (set): Set of possible labels/values for events.
         metadata (dict): Additional information about the event set.
         events (dict): Dictionary of events, with timestamps as keys and labels as values.
     """
@@ -21,13 +21,16 @@ class EventSet:
         Raises:
             ValueError: If the length of timestamps and labels doesn't match or if any label is not in possible_values.
         """
+        self.name = name
+
         if len(timestamps) != len(labels):
             raise ValueError("Length of timestamps and labels must match.")
 
         if possible_values and not all(label in possible_values for label in labels):
             raise ValueError("Some labels are not in the possible values list.")
 
-        self.possible_values = possible_values if possible_values else list(set(labels))
+        # CHANGED: possible_values stored as a set to improve time complexity of checking if a value is in possible_values
+        self.possible_values = possible_values if possible_values else set(labels)
         self.metadata = metadata if metadata else {}
         self.events = dict(zip(timestamps, labels))
 
@@ -60,7 +63,7 @@ class EventSet:
             raise KeyError(f"Timepoint {timepoint} does not exist.")
         del self.events[timepoint]
 
-    def get_sorted_events(self):
+    def get_sorted_timestamps(self):
         """Return a sorted list of timestamps of events.
 
         Returns:
