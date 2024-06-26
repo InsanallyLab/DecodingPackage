@@ -1,4 +1,3 @@
-from curses import meta
 from neuroconv.basedatainterface import BaseDataInterface
 import pickle
 from pynwb.epoch import TimeIntervals
@@ -6,9 +5,11 @@ from pynwb.base import TimeSeries
 from pynwb.misc import AnnotationSeries
 import numpy as np
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 from pynwb import NWBFile
 import json
+from datetime import datetime 
+from numpy.typing import ArrayLike
 
 class PickleDataInterface(BaseDataInterface):
     """ Interface for spike train data stored in Insanally Lab pickle files. """
@@ -23,6 +24,7 @@ class PickleDataInterface(BaseDataInterface):
         Parameters
         ----------
         file_path : str
+            Path to local pickle file that needs to be converted to NWB.
         read_kwargs : dict, optional
         verbose : bool, default: True
         """
@@ -30,17 +32,20 @@ class PickleDataInterface(BaseDataInterface):
         super().__init__(file_path=file_path)
         self.verbose = verbose
 
-        # Will initialize the following:
-        # self.spike_train
-        # self.starts
-        # self.ends
-        # self.event_times
-        # self.event_labels
-        # self.trial_conditions
+        '''
+        _read_file() initializes the following fields with Pickle file data:
+            self.session_start_time
+            self.spike_train
+            self.starts 
+            self.ends 
+            self.event_times 
+            self.event_labels
+            self.trial_conditions
+        '''
         self._read_kwargs = read_kwargs
         self._read_file(file_path, **read_kwargs)
 
-        # To add to nwb file as nwb objects 
+        # NWB objects that will be added to the generated NWB file
         self.time_intervals = None
         self.spike_time_series = None
         self.event_series = None
@@ -49,40 +54,47 @@ class PickleDataInterface(BaseDataInterface):
 
     def _read_file(self, file_path: str, **read_kwargs):
         '''
-        Pickle file format:
+        Reads relevant data from the pickle file stored in file_path. Stores
+        all data as np.ndarrays.
 
+        Insanally Lab pickle file format:
             data = pickle.load(file)
+            session_start_time = data.meta.date # str
             spike_train = data.spikes.times # ndarray
             starts = data.trials.starts # ndarray
             ends = data.trials.ends # ndarray
-
-            incorporate later if needed?:
-            lick_times = data.behavior.lick_times # ndarray
+            event_times = data.behavior.lick_times # ndarray
         '''
         file = open(file_path, 'rb')
         data = pickle.load(file)
         file.close()
 
-        self.spike_train = data.spikes.times # ndarray
+        self.session_start_time = datetime.strptime(data.meta.date, "%m/%d/%Y")
 
-        self.starts = data.trials.starts # ndarray
-        self.ends = data.trials.ends # ndarray
+        self.spike_train = data.spikes.times
+
+        self.starts = data.trials.starts
+        self.ends = data.trials.ends 
         if len(self.starts) != len(self.ends):
             raise ValueError("Length of start times must match length of end times")
 
         self.event_times = data.behavior.lick_times
-        self.event_labels = ["lick" for time in self.event_times]
+        self.event_labels = np.array(["lick" for time in self.event_times])
 
         target_bools = data.trials.target
-        self.trial_conditions = ["target" if target_bool == True else "non-target" for target_bool in target_bools]
+        self.trial_conditions = np.array(["target" if target_bool == True 
+                                            else "non-target" 
+                                            for target_bool in target_bools])
 
 
     def get_metadata(self) -> dict:
+        """ Fills in metadata for PickleDataInterface. """
+
         metadata = super().get_metadata()
         metadata["TimeIntervals"] = dict(
             trials=dict(
                 table_name="trial times",
-                table_description=f"trial start and end times generated from {self.source_data['file_path']}",
+                table_description=f"trial start and end times generated from {self.source_data['file_path']}"
             )
         )
         metadata["AnnotationSeries"] = dict(
@@ -99,10 +111,16 @@ class PickleDataInterface(BaseDataInterface):
                 description= "target/non-target condition for each trial"
             ) 
         )
+
+        """ Adds session start time information to the NWB metadata. This is a 
+        required metadata field for NWB files. """
+        metadata["NWBFile"]["session_start_time"] = self.session_start_time
+
         return metadata
 
     def get_metadata_schema(self) -> dict:
-        """Safely load metadata from .json file."""
+        """Safely loads metadata schema from .json file."""
+
         file_path = Path('pickle_schema.json')
         assert file_path.is_file(), f"{file_path} is not a file."
         assert file_path.suffix in (".json"), f"{file_path} is not a valid json file."
@@ -111,63 +129,88 @@ class PickleDataInterface(BaseDataInterface):
             dictionary = json.load(fp=fp)
         return dictionary
 
-
-    '''
-    Pynapple converts TimeIntervals into IntervalSets when loading nwb files
-    '''
     def convert_to_time_intervals(
         self,
-        starts,
-        ends, 
-        time_intervals_name: str,
-        time_intervals_description: str
+        name: str,
+        starts: ArrayLike,
+        ends: ArrayLike
     ) -> TimeIntervals:
         """
-        Create a TimeIntervals object with trial start and end times.
+        Creates a TimeIntervals object with trial start and end times.
 
         Parameters
         ----------
-        table_name : str, optional
+        name : str
             The name of the TimeIntervals object.
-
-        table_description : str, optional
-            The description of the TimeIntervals object.
+        starts : array-like
+            The start times of each trial. 
+        ends : array-like
+            The end times of each trial.
 
         Returns
         -------
-        TimeIntervals
-
+        TimeIntervals object. 
+        Pynapple converts NWB TimeIntervals objects into IntervalSets when 
+        loading NWB files.
         """
-        time_intervals = TimeIntervals(name=time_intervals_name, 
-                                       description=time_intervals_description)
+        time_intervals = TimeIntervals(name=name)
 
         for start, end in zip(starts, ends):
             time_intervals.add_interval(start_time=start, stop_time=end)
 
         return time_intervals
     
-
-    '''
-    Pynapple converts AnnotationSeries into Ts when loading nwb files
-    '''
     def convert_to_annotation_series(
         self, 
-        name : str,
-        data,
-        timestamps
+        name: str,
+        timestamps: ArrayLike
     ) -> AnnotationSeries:
-        return AnnotationSeries(name=name, data=data, timestamps=timestamps)
+        """
+        Creates a AnnotationSeries object with one-dimensional timestamps.
 
-    '''
-    Pynapple converts 1D TimeSeries into Tsd when loading nwb files
-    '''
+        Parameters
+        ----------
+        name : str
+            The name of the AnnotationSeries object.
+        timestamps : array-like
+            The timestamps to be stored. 
+
+        Returns
+        -------
+        AnnotationSeries object. 
+        Pynapple converts NWB AnnotationSeries objects into Ts objects when 
+        loading NWB files.
+        """
+        return AnnotationSeries(name=name, data=[], timestamps=timestamps)
+
     def convert_to_time_series(
         self,
-        name : str,
-        labels,
-        timestamps,
-        label_units : str = "unknown",
+        name: str,
+        labels: ArrayLike,
+        timestamps: ArrayLike,
+        label_units: str = "unknown",
     ) -> TimeSeries:
+        """
+        Creates a TimeSeries object with timestamps and the associated labels.
+
+        Parameters
+        ----------
+        name : str
+            The name of the AnnotationSeries object.
+        labels : array-like
+            The labels to be stored.
+        timestamps : array-like
+            The timestamps to be stored. 
+        label_units : str, optional
+            TimeSeries objects require the units of the labels to be passed in. 
+            Defaults to "unknown". 
+
+        Returns
+        -------
+        TimeSeries object. 
+        Pynapple converts NWB TimeSeries objects into Tsd objects when 
+        loading NWB files.
+        """
         return TimeSeries(name=name, data=labels, timestamps=timestamps, unit=label_units)
 
 
@@ -177,28 +220,30 @@ class PickleDataInterface(BaseDataInterface):
         metadata: Optional[dict] = None,
     ) -> NWBFile:
         """
-        Run the NWB conversion for the instantiated data interface.
+        Converts trial time intervals, spike train, event timestamps and labels,
+        and trial condition data into the appropriate NWB objects. Runs the NWB 
+        conversion for the instantiated data interface.
 
         Parameters
         ----------
         nwbfile : NWBFile
             An in-memory NWBFile object to write to the location.
         metadata : dict, optional
-            Metadata dictionary with information used to create the NWBFile when one does not exist or overwrite=True.
+            Metadata dictionary with information used to create the NWBFile when
+            one does not exist or overwrite=True.
         
-        Note: even though metadata is not used in this function, it is a required parameter as per BaseDataInterface's 
-        definition of add_to_nwbfile. 
+        Note: even though metadata is not used in this function, it is a 
+        required parameter as per BaseDataInterface's definition of 
+        add_to_nwbfile. 
         """
         self.time_intervals = self.convert_to_time_intervals(
-                                starts=self.starts, 
-                                ends=self.ends,
-                                time_intervals_name="trials",
-                                time_intervals_description="trial start and end times")
+            name="trial_times",
+            starts=self.starts, 
+            ends=self.ends)
         nwbfile.add_time_intervals(self.time_intervals)
 
         self.spike_time_series = self.convert_to_annotation_series(
             name="spikes",
-            data=[],
             timestamps=self.spike_train)
 
         nwbfile.add_acquisition(self.spike_time_series)

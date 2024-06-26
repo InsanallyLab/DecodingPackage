@@ -1,85 +1,60 @@
 import os
-from wsgiref import validate
 import numpy as np
 import pynapple as nap
-import pandas as pd
+from typing import Union, Optional
+from numpy.typing import ArrayLike, NDArray
 
 class Session:
-
-    def __init__(self, spike_times, interval_sets, event_sets, name=None):
-        """Initialize the Session class.
-
-        Args:
-            spike_times (array-like): Spike times for SpikeTrain.
-            interval_sets (array-like): List of interval sets for the session. 
-            event_sets (array-like): List of EventSets for the session.
-            name (str, optional): Session name. Defaults to None.
+    """ Preprocesses spike train data and computes log ISIs."""
+    
+    def __init__(
+        self, 
+        spike_times: Union[ArrayLike, nap.Ts], 
+        interval_sets: dict[str, nap.IntervalSet], 
+        event_sets: dict[str, nap.Tsd]):
         """
-        self.name = name
+        Parameters
+        ----------
+        spike_times : array-like or nap.Ts
+            Spike times for the session. 
+        interval_sets : dict[str, nap.IntervalSet]
+            Dict of interval sets for the session. The keys are the name of 
+            each interval set. 
+        event_sets : dict[str, nap.Tsd]: 
+            Dict of event sets for the session. The keys are the name of each
+            event set.
+        """
 
         if not isinstance(spike_times, nap.Ts):
-        # CHANGED: spike_train is Ts instead of Tsd
             self.spike_train = nap.Ts(t=spike_times)
         else:
             self.spike_train = spike_times
-            
-        self.interval_sets = {iset.name: iset for iset in interval_sets}
-        self.event_sets = {eset.name: eset for eset in event_sets}
+        
+        # CHANGED: dict of IntervalSets instead of list of IntervalSets
+        self.interval_sets = interval_sets
+        # CHANGED: dict of Tsd instead of list of EventSets 
+        self.event_sets = event_sets
 
-        self.iset_to_spikes = {} #maps interval_name -> spikes Ts
-        self.interval_to_spikes = {} #maps interval_name -> start,end -> spikes Ts
-        self.iset_to_log_ISIs = {} #maps interval_name -> np array of log ISIs
+        self.iset_to_spikes = {} # Maps interval_name -> spikes Ts
+        self.interval_to_spikes = {} # Maps interval_name -> start, end -> spikes Ts
+        self.iset_to_log_ISIs = {} # Maps interval_name -> np array of log ISIs
 
-        self.locked_iset_to_spikes = {} #maps (event_name, interval_name) -> spikes Ts
-        self.locked_interval_to_spikes = {} #maps (event_name, interval_name) -> start,end -> spikes Ts
-        self.locked_iset_to_log_ISIs = {} #maps (event_name, interval_name) -> np array of log ISIs
+        self.locked_iset_to_spikes = {} # Maps (event_name, interval_name) -> spikes Ts
+        self.locked_interval_to_spikes = {} # Maps (event_name, interval_name) -> start, end -> spikes Ts
+        self.locked_iset_to_log_ISIs = {} # Maps (event_name, interval_name) -> np array of log ISIs
 
-    def add_interval_set(self, interval_set, override=False):
-        """Add an interval set to the session.
-
-        Args:
-            interval_set (UniqueIntervalSet): The interval set to add.
-            override (bool, optional): Whether to override if an interval set with the same name exists. Defaults to False.
-
-        Raises:
-            Warning: Raises a warning if an interval set with the same name exists and override is False.
+    def slice_spikes_by_intervals(self, iset_name: str):
         """
-        if interval_set.name in self.interval_sets and not override:
-            raise Warning(f"Interval set with name {interval_set.name} already exists. Use 'override=True' to replace it.")
-        elif interval_set.name in self.interval_sets and override:
-            print(f"Warning: Overriding existing interval set with name {interval_set.name}")
-            
-        self.interval_sets[interval_set.name] = interval_set
-
-    def add_event_set(self, event_set, override=False):
-        """Add an event set to the session.
-
-        Args:
-            event_set (EventSet): The event set to add.
-            override (bool, optional): Whether to override if an event set with the same name exists. Defaults to False.
-
-        Raises:
-            Warning: Raises a warning if an event set with the same name exists and override is False.
-        """
-        if event_set.name in self.event_sets and not override:
-            raise Warning(f"Event set with name {event_set.name} already exists. Use 'override=True' to replace it.")
-        elif event_set.name in self.event_sets and override:
-            print(f"Warning: Overriding existing event set with name {event_set.name}")
-            
-        self.event_sets[event_set.name] = event_set
-
-    def slice_spikes_by_intervals(self, iset_name):
-        """Restricts spike data to a specified interval and caches the result.
+        Restricts spike data to a specified interval and caches the result.
 
         This function restricts spike data to a given interval defined by the 
         provided interval name. If the results have been previously computed, 
         they are retrieved from cache to speed up the process.
 
-        Args:
-            iset_name (str): The name of the IntervalSet to restrict the spikes to.
-
-        Returns: 
-            None. Alters self.interval_to_spikes and self.iset_to_spikes in-place.
+        Parameters
+        ----------
+        iset_name : str
+            The name of the IntervalSet to restrict the spikes to.
         """
 
         # Fetch the desired interval set (padded if padding has been added to the object).
@@ -92,21 +67,12 @@ class Session:
         # Restrict the spike train to the interval.
         restricted_spikes = self.spike_train.restrict(interval_set)
 
-        # spike_pointer = 0
-
         # Initialize a storage for mapped spikes if not present.
         if iset_name not in self.interval_to_spikes: 
             self.interval_to_spikes[iset_name] = {}
         
         # Iterate through the intervals and map spikes.
         for start, end in zip(interval_set.start, interval_set.end):
-            # OLD LOGIC
-            # interval_spikes = []
-            # while spike_pointer < len(restricted_spikes) and restricted_spikes[spike_pointer] <= end:
-            #     if restricted_spikes[spike_pointer] >= start:
-            #         interval_spikes.append(restricted_spikes[spike_pointer])
-            #     spike_pointer += 1
-            
             # CHANGED: for spike train as Ts
             interval_spikes = restricted_spikes.get(start=start, end=end)
 
@@ -115,30 +81,31 @@ class Session:
         # Cache the result for future use.
         self.iset_to_spikes[iset_name] = restricted_spikes
 
+    def compute_log_ISIs(
+        self, 
+        iset_name: str, 
+        lock_point: Optional[str] = None, 
+        scaling_factor: Union[int, float] = 1000):
+        """
+        Computes log ISIs for a specific interval set and stores them.
+        If a lock point is passed in, the function first time-locks the spike 
+        train to that lock point in each interval before computing log ISIs.
 
-    def compute_log_ISIs(self, iset_name, lock_point=None, scaling_factor=1000):
-        """Compute logarithm of inter-spike intervals (ISIs) for a specific interval set and store them.
+        Parameters
+        ----------
+        iset_name : str
+            Name of the interval set to compute log ISIs for.
+        lock_point : str, optional
+            Either the name of the event set that the spike trains should be 
+            time-locked to, or 'start'/'end' to time-lock to the start/end of 
+            each interval.
+        scaling_factor : int, optional
+            Factor to scale the spike times. Defaults to 1000.
 
-        This function uses the spike train mapped to a particular interval set
-        to compute the logarithm of inter-spike intervals. 
-        If an event set name is passed in, the function first time-locks the spike 
-        train to the corresponding event that occurs in each interval before computing log ISIs.
-
-        Args:
-            iset_name (str): Name of the interval set whose mapped spikes should be used.
-            lock_point (str, optional): Either the name of the event set that the spikes should be time-locked to,
-                or 'start'/'end' to time-lock to the start/end of each interval.
-            scaling_factor (int, optional): Factor to scale the spike times. Defaults to 1000.
-
-        Returns:
-            numpy.ndarray: Array containing logISIs for the specified interval.
-
-        Altered Data Structures:
-            self.iset_to_log_ISIs: Dictionary storing log ISIs mapped to specific intervals.
-        
-        Raises:
-            KeyError: If the interval_name does not exist in the interval_sets,
-            or if lock point is invalid.
+        Returns
+        -------
+        numpy.ndarray: 2D array containing logISIs for the specified interval 
+        set. Shape is (num trials, num ISIs per trial)
         """
 
         if iset_name not in self.interval_sets:
@@ -165,7 +132,6 @@ class Session:
                 spikes = self.locked_interval_to_spikes[(lock_point, iset_name)][(start, end)]
             else:
                 spikes = self.interval_to_spikes[iset_name][(start, end)]
-            # CHANGED: for spike train as Ts
             spikes = spikes.t
             
             # Scaling the spikes using numpy's vectorized operation
@@ -187,18 +153,23 @@ class Session:
         return self.iset_to_log_ISIs[iset_name]
 
 
-    def time_lock_to_interval(self, iset_name, lock_point):
-        """Time-lock spikes to the start or end of intervals.
+    def time_lock_to_interval(self, iset_name: str, lock_point: str):
+        """
+        Time-locks spike trains in a given interval set to the start or end of 
+        their interval.
         
-        This function adjusts spike times according to the start or end of the 
-        specified intervals, updating the mapped and modified spike trains. It treats "start" and "end" like an event_name for storing. 
+        This function treats the start/end of the interval as the new 'zero', 
+        and shifts the spike times accordingly. It then stores the time-locked
+        spike trains in self.locked_iset_to_spikes and 
+        self.locked_interval_to_spikes.
         
-        Args:
-            iset_name (str): Name of the interval set from which unpadded start and end times are retrieved.
-            lock_point (str): Either 'start' or 'end', indicating where spikes should be time-locked.
-            
-        Returns:
-            None: Alters self.locked_iset_to_spikes and self.locked_interval_to_spikes in-place.
+        Parameters
+        ----------
+        iset_name : str
+            Name of the interval set for which spike trains should be time-locked.
+        lock_point : str
+            Either 'start' or 'end', indicating whether spikes should be 
+            time-locked to the start or the end of their interval. 
         """
         
         if lock_point not in ['start', 'end']:
@@ -207,38 +178,6 @@ class Session:
         # Return if result is already computed and stored.
         if (lock_point, iset_name) in self.locked_iset_to_spikes:
             return
-
-        # OLD LOGIC
-
-        # starts = self.interval_sets[iset_name].start
-        # ends = self.interval_sets[iset_name].end
-            
-        # # Sort the keys of interval_to_spikes for this iset_name based on the start times
-        # sorted_keys = sorted(self.interval_to_spikes[iset_name].keys(), key=lambda x: x[0])
-
-        # modified_spikes_agg = []
-
-        # for idx, (start, end) in enumerate(sorted_keys):
-            
-        #     if lock_point == 'start':
-        #         time_adjustment = starts[idx]
-        #     else:
-        #         time_adjustment = ends[idx]
-            
-        #     # Adjust spike times based on the lock point
-        #     adjusted_spikes = [spike - time_adjustment for spike in self.interval_to_spikes[iset_name][(start, end)]]
-            
-        #     # Store in the mapped structure
-        #     key = (lock_point, iset_name)
-        #     if key not in self.modified_spike_trains_mapped:
-        #         self.modified_spike_trains_mapped[key] = {}
-        #     self.modified_spike_trains_mapped[key][(start, end)] = np.array(adjusted_spikes)
-            
-        #     modified_spikes_agg.extend(adjusted_spikes)
-
-        # # Convert the accumulated spikes into a Tsd object and store
-        # tsd_obj = nap.Tsd(t=np.array(modified_spikes_agg))
-        # self.modified_spike_trains[(lock_point, iset_name)] = tsd_obj
 
         locked_spikes_agg = []
 
@@ -264,33 +203,51 @@ class Session:
         self.locked_iset_to_spikes[(lock_point, iset_name)] = tsd_obj
 
 
-    def _match_event_to_interval(self, event_set, iset_name):
-        """Match each interval of a specific type to a corresponding event in the provided event set.
+    def _match_event_to_interval(self, event_set: nap.Tsd, iset_name: str) -> dict:
+        """
+        Matches each interval in the interval set to the corresponding event
+        occurring in that interval. There should be exactly one event
+        corresponding to each interval in the interval set.
 
-        Args:
-            event_set: Event set to be matched with intervals.
-            iset_name (str): Name of the interval type being matched.
+        Parameters
+        ----------
+        event_set : nap.Tsd
+            Event set to be matched with intervals.
+        iset_name : str
+            Name of the interval set being matched.
 
-        Returns:
-            dict: Mapping of intervals to corresponding event timestamps.
+        Returns
+        -------
+        dict: Maps each interval to the timestamp of its corresponding event.
 
         """
         matched_events = {}
         for start, end in self.interval_to_spikes[iset_name].keys():
-            events_in_interval = [ts for ts in event_set.events.keys() if start <= ts <= end]
+            # CHANGED: Tsd instead of EventSet
+            events_in_interval = event_set.get(start=start, end=end).t
+
             if len(events_in_interval) != 1:
                 raise ValueError(f"Interval ({start}, {end}) doesn't match exactly one event in event_set.")
             matched_events[(start, end)] = events_in_interval[0]
 
         return matched_events
 
-    def time_lock_to_event(self, eset_name, iset_name):
-        """Recenter spike times based on events.
+    def time_lock_to_event(self, eset_name: str, iset_name: str):
+        """
+        Time-locks spike trains in a given interval set to the corresponding
+        event that occurs in their interval.
 
-        Args:
-            eset_name (str): Name of the Event set to recenter spikes.
-            iset_name (str): Name of the interval whose mapped spikes should be used. 
+        This function treats the event occuring in the interval as the new 
+        'zero', and shifts the spike times accordingly. It then stores the 
+        time-locked spike trains in self.locked_iset_to_spikes and 
+        self.locked_interval_to_spikes.
 
+        Parameters
+        ----------
+        eset_name : str 
+            Name of the event set to time-lock spikes with.
+        iset_name : str 
+            Name of the interval set for which spike trains should be time-locked.
         """
 
         # Return if result is already computed and stored.
@@ -312,24 +269,26 @@ class Session:
 
             locked_spikes_agg.extend(locked_spikes)
 
-        # CHANGED: spike_trains Ts instead of Tsd
         self.locked_iset_to_spikes[(eset_name, iset_name)] = nap.Ts(t=np.array(locked_spikes_agg))
 
 
-    def save_spikes(self, iset_name, filename, lock_point=None):
-        """Save spike train for a specific interval in npz format. Optionally add time-locking.
+    def save_spikes(self, iset_name: str, file_path: str, lock_point: Optional[str] = None):
+        """
+        Saves spike train for a specific interval set to a .npz file. 
+        If a lock point is provided, it saves the time-locked spike train instead.
 
-        Args:
-            iset_name (str): Name of the interval set to save a spike train for.
-            eset_name (str, optional): Name of the lock_point (an event, or the start/end of the interval)
-                to time lock to.
-            filename (str): Filename to save the spike train.
-
-        Raises:
-            RuntimeError: If the provided filename is invalid.
+        Parameters
+        ----------
+        iset_name : str
+            Name of the interval set to save a spike train for.
+        eset_name : str, optional
+            Name of the lock point (an event set, or the start/end of the 
+            interval) to time lock to.
+        file_path : str 
+            Path to save the spike train .npz file at.
 
         Loading Example:
-            spike_train = nap.load_file(filename)
+            spike_train = nap.load_file(file_path)
         """
         if lock_point is not None:
             if (lock_point, iset_name) not in self.locked_iset_to_spikes:
@@ -337,51 +296,31 @@ class Session:
         elif iset_name not in self.iset_to_spikes:
             raise KeyError("Interval set doesn't exist, or spikes have not been mapped to this interval set")
 
-        self._validate_filename(filename)
+        self._validate_file_path(file_path)
         if lock_point is not None:
-            self.locked_iset_to_spikes[(lock_point, iset_name)].save(filename)
+            self.locked_iset_to_spikes[(lock_point, iset_name)].save(file_path)
         else:
-            self.iset_to_spikes[iset_name].save(filename)
-
-        # OLD LOGIC
-        # if mapped_filename:
-        #     self._validate_filename(mapped_filename)
-        #     mapped_spikes_data = self.locked_interval_to_spikes.get((event_name, interval_name), {})
-            
-        #     if mapped_spikes_data:
-        #         intervals, spikes = zip(*mapped_spikes_data.items())
-        #         starts, ends = zip(*intervals)
-                
-        #         np.savez(mapped_filename, 
-        #                 event_names=np.array([event_name] * len(starts)), 
-        #                 interval_names=np.array([interval_name] * len(starts)), 
-        #                 starts=np.asarray(starts), 
-        #                 ends=np.asarray(ends), 
-        #                 spikes=spikes)
-            
-        # if spike_train_filename:
-        #     spike_train_data = self.locked_interval_to_spikes.get((event_name, interval_name))
-        #     if spike_train_data:
-        #         spike_train_data.save(spike_train_filename)
+            self.iset_to_spikes[iset_name].save(file_path)
 
 
-    def save_log_ISIs(self, iset_name, filename, lock_point=None):
-        """Save computed logISIs for a specific interval to a .npz file. 
-        Optionally add time-locking.
+    def save_log_ISIs(self, iset_name: str, file_path: str, lock_point: Optional[str] = None):
+        """
+        Saves computed log ISIs for a specific interval set to a .npz file. 
+        If a lock point is provided, it first time locks the interval set before
+        computing log ISIs.
 
-        Args:
-            iset_name (str): Name of the interval set to save log ISIs for.
-            eset_name (str, optional): Name of the lock_point (an event, or the start/end of the interval)
-                to time lock to.
-            filename (str): Filename to save the log ISIs.
-
-
-        Raises:
-            ValueError: If logISIs haven't been computed for the given event and interval.
-            RuntimeError: If the filename is invalid.
+        Parameters
+        ----------
+        iset_name : str
+            Name of the interval set to save log ISIs for.
+        eset_name : str, optional
+            Name of the lock point (an event set, or the start/end of the 
+            interval) to time lock to.
+        file_path : str
+            Path to save the log ISIs .npz file at.
 
         Loading Example:
-            with np.load(filename, allow_pickle=True) as data:
+            with np.load(file_path, allow_pickle=True) as data:
                 log_ISIs = data['log_ISIs']
         """
 
@@ -391,39 +330,30 @@ class Session:
         elif iset_name not in self.iset_to_log_ISIs:
             raise KeyError("Interval set doesn't exist, or log ISIs have not been computed for this interval set")
 
-        self._validate_filename(filename)
+        self._validate_file_path(file_path)
         if lock_point is not None:
             locked_log_ISIs = self.locked_iset_to_log_ISIs[(lock_point, iset_name)]
-            np.savez(filename, locked_log_ISIs=locked_log_ISIs)
+            np.savez(file_path, locked_log_ISIs=locked_log_ISIs)
         else:
             log_ISIs = self.iset_to_log_ISIs[iset_name]
-            np.savez(filename, log_ISIs=log_ISIs)
-        
-        # OLD LOGIC
-        # log_ISIs_data = self.locked_iset_to_log_ISIs.get((event_name, interval_name))
-
-        # if log_ISIs_data is None:
-        #     raise ValueError(f"LogISIs not computed for event '{event_name}' and interval '{interval_name}'. Run compute_log_ISIs method first.")
-        
-        # self._validate_filename(filename)
-        # np.savez(filename, log_ISIs=log_ISIs_data)
+            np.savez(file_path, log_ISIs=log_ISIs)
 
 
     @staticmethod
-    def _validate_filename(filename):
-        """Validate the provided filename.
-
-        Args:
-            filename (str): Filename to validate.
-
-        Raises:
-            RuntimeError: If the filename is invalid.
+    def _validate_file_path(file_path: str):
         """
-        if not isinstance(filename, str):
-            raise RuntimeError("Filename should be a string.")
-        if os.path.isdir(filename):
-            raise RuntimeError(f"{filename} is a directory.")
-        directory = os.path.dirname(filename)
+        Validates the provided file path.
+
+        Parameters
+        ----------
+        file_path : str
+            File path to validate.
+        """
+        if not isinstance(file_path, str):
+            raise RuntimeError("File path should be a string.")
+        if os.path.isdir(file_path):
+            raise RuntimeError(f"{file_path} is a directory.")
+        directory = os.path.dirname(file_path)
         if directory and not os.path.exists(directory):
             raise RuntimeError(f"Path {directory} doesn't exist.")
 

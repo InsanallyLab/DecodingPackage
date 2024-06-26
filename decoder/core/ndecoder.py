@@ -5,24 +5,69 @@ from scipy.interpolate import interp1d
 from sklearn.model_selection import StratifiedKFold
 from decoder.core.model import Model
 import pickle
+from numpy.typing import ArrayLike, NDArray
         
 class NDecoder:
-    def __init__(self, bandwidth, min_ISIs, conditions):
+    """
+    Stores the generated decoder, which uses estimated ISI distributions to
+    decode the condition (e.g. stimulus category or behavioral choice) of a 
+    trial via Bayesian inference.
+
+    Attributes
+    ----------
+    self.bw : float
+        Stores optimal kernel bandwidth for Kernel Density Estimation methods 
+        used to estimate ISI distributions. 
+    self.min_ISIs : int
+        Stores the minimum number of ISIs that should be present in a trial in 
+        order to proceed with estimating the ISI distribution.
+    self.conditions : array-like
+        Stores all the possible trial conditions. 
+        For example, ["target", "non-target"] for stimulus category, or
+        ["go", "no-go"] for behavioral choice.
+    self.model : Model
+        Stores all relevant unconditional and conditional probability 
+        information for observing given ISIs.
+    """
+    def __init__(
+        self, 
+        bandwidth: float, 
+        min_ISIs: int, 
+        conditions: ArrayLike):
+
         self.bw = bandwidth
         self.min_ISIs = min_ISIs
-        self.conditions = conditions #list of possible labels
+        self.conditions = conditions
         self.model = Model(conditions) 
 
-    def _create_condition_subset_mapping(self, X, y):
+    def _create_condition_subset_mapping(self, X: ArrayLike, y: ArrayLike) -> dict:
+        """
+        Maps each trial condition to all log ISIs from trials with that 
+        condition.
+
+        Parameters
+        ----------
+        X : array-like, shape (num trials, num ISIs per trial)
+            Stores log ISIs per trial.
+        y : array-like, shape (num_trials,)
+            Stores the condition for each trial.
+
+        Returns
+        -------
+        condition_subset_mapping : dict
+            A dict mapping each trial condition (str) to all log ISIs from trials
+            with that condition (array-like).
+        """
+
         all_conditions = self.conditions
         condition_subset_mapping = {}
 
         y = np.asarray(y)
 
-        # Check for invalid labels in y
-        invalid_labels = set(y) - set(all_conditions)
-        if invalid_labels:
-            raise ValueError(f"Invalid labels found: {', '.join(invalid_labels)}")
+        # Check for invalid conditions in y
+        invalid_conditions = set(y) - set(all_conditions)
+        if invalid_conditions:
+            raise ValueError(f"Invalid labels found: {', '.join(invalid_conditions)}")
 
         for condition in all_conditions:
             condition_indices = []
@@ -34,20 +79,26 @@ class NDecoder:
         return condition_subset_mapping
 
     @staticmethod
-    def estimate_isi_distribution(log_ISIs, bandwidth):
+    def estimate_isi_distribution(log_ISIs: NDArray, bandwidth: float):
         """
-        Estimate the Inter-Spike Interval (ISI) Distribution using Kernel Density Estimation (KDE).
+        Estimates Inter-Spike Interval (ISI) distributions using Kernel Density
+        Estimation (KDE).
 
-        Args:
-            log_ISIs (numpy.ndarray): An array of log-transformed Inter-Spike Interval (ISI) values.
-            bandwidth (float): The bandwidth parameter for the KDE.
+        Parameters
+        ----------
+        log_ISIs : numpy.ndarray 
+            An array of log-transformed ISI values.
+        bandwidth : float
+            The kernel bandwidth for KDE.
 
-        Returns:
-            tuple: A tuple containing two functions:
-                - A function that interpolates the estimated probability density function (PDF).
-                - A function to generate an inverse Cumulative Distribution Function (CDF) for sampling.
+        Returns
+        -------
+        pdf_interpolator : scipy.interp1d object
+            Represents the estimated probability density function (PDF).
+        cdf_inverse_interpolator : scipy.interp1d object
+            Represents the estimated inverse Cumulative Distribution Function 
+            (CDF) for sampling.
         """
-        # x = np.linspace(-2, 6, 100)
         # TODO: write x in relation to fftkde data's min and max
         x = np.linspace(-2, 20, 100)
 
@@ -68,26 +119,21 @@ class NDecoder:
         
         return pdf_interpolator, cdf_inverse_interpolator 
 
-    def fit(self, X, y):
+    def fit(self, X: ArrayLike, y: ArrayLike) -> Model:
         """
-        Fit the model to the given data.
+        Fits the model to the given ISI data.
 
-        Parameters:
-            X : array-like, shape (num_trials, len_of_isi)
-                LogISIs array for each trial.
-            y : array-like, shape (num_trials,)
-                Labels or conditions for each trial.
+        Parameters
+        ----------
+        X : array-like, shape (num_trials, len_of_isi)
+            Log ISIs for each trial.
+        y : array-like, shape (num_trials,)
+            Condition for each trial.
 
-        Returns:
-            model : Model object
-                The fitted Model object containing likelihood estimates.
-
-        Raises:
-            ValueError: If the input data X or y is not valid.
-
-        Notes:
-            This method fits the model to the provided data by estimating ISI distributions,
-            priors, and likelihoods for different conditions.
+        Returns
+        -------
+        model : Model
+            The fitted Model object containing likelihood estimates.
         """ 
 
         decoding_conditions = self._create_condition_subset_mapping(X, y)
@@ -98,7 +144,7 @@ class NDecoder:
             print("Insufficient LogISIs data for analysis.")
             return None
         
-        log_ISIs_concat = np.concatenate(X) #flattens it to one array of ISIs
+        log_ISIs_concat = np.concatenate(X) # Flattens it to one array of ISIs
 
         if len(log_ISIs_concat) < self.min_ISIs:
             print("Insufficient LogISIs data after flattening for analysis.")
@@ -118,7 +164,8 @@ class NDecoder:
             if len(logISIs_concat)< self.min_ISIs:
                 print(f"Skipping fold. Not enough ISIs for the {label} condition")
                 return None
-            f,inv_f = self.estimate_isi_distribution(logISIs_concat, self.bw) # This is a gaussian KDE
+            # Uses Gaussian KDE
+            f,inv_f = self.estimate_isi_distribution(logISIs_concat, self.bw)
             prior_0 = 1.0 / len(self.conditions)
 
             # Calculate likelihood for 0-ISI trials
@@ -130,23 +177,33 @@ class NDecoder:
 
         return self.model 
 
-    def _predict_single_trial(self, model, trial_logISIs):
+    def _predict_single_trial(self, trial_logISIs: ArrayLike) -> tuple[str, float, dict, bool]:
         """
-        Predicts the condition for a single trial using calculated probabilities.
+        Predicts the condition for a single trial from its log ISIs.
 
-        Args:
-            model: The model containing condition parameters and priors.
-            trial_logISIs: List of inter-stimulus log intervals for the trial.
+        Parameters
+        ----------
+        trial_logISIs: array-like 
+            All log ISIs for the trial.
 
-        Returns:
-            predicted condition, probability of predicted condition, probabilities of all conditions, flag indicating if ISIs are empty
+        Returns
+        -------
+        max_cond : str 
+            The predicted condition for the trial.
+        max_cond_prob : float
+            The probability of the predicted condition.
+        all_probs : dict 
+            Maps each trial condition (str) to the predicted probability of
+            the trial having that condition.
+        empty_ISIs : bool
+            Flag indicating if trial has no ISIs.
         """
         trial_logISIs = np.asarray(trial_logISIs)
         # No ISIs in trial, make a guess based on priors
         if len(trial_logISIs) < 1:
-            max_cond = max(self.conditions, key=lambda cond: model.conds[cond].prior_empty)
-            all_priors = {cond: model.conds[cond].prior_empty for cond in self.conditions}
-            return max_cond, model.conds[max_cond].prior_empty, all_priors, True
+            max_cond = max(self.conditions, key=lambda cond: self.model.conds[cond].prior_empty)
+            all_priors = {cond: self.model.conds[cond].prior_empty for cond in self.conditions}
+            return max_cond, self.model.conds[max_cond].prior_empty, all_priors, True
         
         # ISIs were present in the trial, predict based on normalized probabilities
         else:
@@ -157,8 +214,8 @@ class NDecoder:
             for cond in self.conditions:
                 # Calculate cumulative log-likelihood ratio (LLR) after each LogISI
                 probabilities[cond] = np.cumsum(
-                    np.log10(np.concatenate(([model.conds[cond].prior_0],
-                                            model.conds[cond].pdf(trial_logISIs)))))
+                    np.log10(np.concatenate(([self.model.conds[cond].prior_0],
+                                            self.model.conds[cond].pdf(trial_logISIs)))))
 
                 # Exponentiate back from log to enable normalization
                 probabilities[cond] = np.power(10, probabilities[cond])
@@ -170,90 +227,82 @@ class NDecoder:
 
             # Normalize all probabilities
             for cond in self.conditions:
-                # probabilities[cond] /= sum_of_probs
-                probabilities[cond] = np.divide(probabilities[cond], sum_of_probs, 
+                probabilities[cond] = np.divide(probabilities[cond], 
+                                                sum_of_probs, 
                                                 out= np.zeros_like(probabilities[cond]), 
                                                 where= sum_of_probs != 0)
-
 
             max_cond = max(self.conditions, key=lambda cond: probabilities[cond][-1])
             all_probs = {cond : probabilities[cond][-1] for cond in probabilities}
             return max_cond, probabilities[max_cond][-1], all_probs, False
 
 
-    def predict_conditions(self, X):
+    def predict_conditions(self, X: ArrayLike) -> NDArray:
         """
-        Predict the condition for each trial in X.
+        Predicts the condition for each trial in X from its log ISIs.
 
-        Parameters:
-            X : array-like, shape (num_trials, len_of_isi)
-                LogISIs array for multiple trials.
+        Parameters
+        ----------
+        X : array-like, shape (num trials, num ISIs per trial)
+            Log ISIs for each trial.
 
-        Returns:
-            predicted_conditions : numpy array, shape (num_trials,)
-                Predicted conditions for each trial.
+        Returns
+        -------
+        predicted_conditions : numpy.ndarray, shape (num_trials,)
+            Predicted condition for each trial.
 
         """
         predicted_conditions = []
         for trial_logISIs in X:
-            pred_condition, _, _, _ = self._predict_single_trial(self.model, trial_logISIs)
+            pred_condition, _, _, _ = self._predict_single_trial(trial_logISIs)
             predicted_conditions.append(pred_condition)
         return np.array(predicted_conditions)
 
-    def predict_condition_probs(self, X):
+    def predict_condition_probs(self, X : ArrayLike) -> pd.DataFrame:
         """
-        Predict the probabilities of each condition for each trial in X.
+        Predicts the probabilities of each condition for each trial in X from 
+        its log ISIs.
 
-        Parameters:
-            X : array-like, shape (num_trials, len_of_isi)
-                LogISIs array for multiple trials.
+        Parameters
+        ----------
+        X : array-like, shape (num trials, num ISIs per trial)
+            Log ISIs for each trial.
 
-        Returns:
-            probabilities : DataFrame, shape (num_trials, num_conditions)
-                Predicted probabilities for each condition for each trial.
+        Returns
+        -------
+        probabilities : DataFrame, shape (num trials, num conditions)
+            Predicted probabilities for each condition for each trial.
 
         """
         probabilities = []
         for trial_logISIs in X:
-            _, _, trial_probs, _ = self._predict_single_trial(self.model, trial_logISIs)
+            _, _, trial_probs, _ = self._predict_single_trial(trial_logISIs)
             probabilities.append([trial_probs[cond] for cond in self.conditions])
         return pd.DataFrame(probabilities, columns=self.conditions)
 
-    # TODO: ask if this is necessary to implement
-    def enforce_equal_trials(self, X, y):
-        # Enforce an even number of trials of each label if necessary 
+    @staticmethod
+    def generate_stratified_K_folds(X: ArrayLike, y: ArrayLike, K: int) -> list:
+        """
+        Generates K stratified folds for cross-validation. Returns the data 
+        split into K train/validate pairs.
 
-        # trials = np.array(trials)
-        
-        # X = np.ones(len(trials))
-        # y = np.ones(len(trials))
-        # for idx,trial in enumerate(trials):
-        #     if sessionfile.trials.target[trial] and sessionfile.trials.go[trial]:
-        #         y[idx] = 1
-        #     elif sessionfile.trials.target[trial] and not sessionfile.trials.go[trial]:
-        #         y[idx] = 2
-        #     elif not sessionfile.trials.target[trial] and sessionfile.trials.go[trial]:
-        #         y[idx] = 3
-        #     elif not sessionfile.trials.target[trial] and not sessionfile.trials.go[trial]:
-        #         y[idx] = 4
+        Parameters
+        ----------
+        X : array-like, shape (num trials, num ISIs per trial)
+            Log ISIs for each trial.
+        y : array-like, shape (num trials,)
+            Condition of each trial.
+        K : int 
+            Number of stratified folds to generate.
 
-        # #Enforce an even number of go and nogo trials
-        # y_go_mask   = np.logical_or(np.equal(y,1) , np.equal(y,3))
-        # y_nogo_mask = np.logical_or(np.equal(y,2) , np.equal(y,4))
-        # ymin = min(np.sum(y_go_mask),np.sum(y_nogo_mask))
-        # y_go_idx = np.where(y_go_mask)[0]
-        # y_nogo_idx = np.where(y_nogo_mask)[0]
-        # idx_go_new = np.random.choice(y_go_idx,ymin,replace=False)
-        # idx_nogo_new = np.random.choice(y_nogo_idx,ymin,replace=False)              #Needs to stay in order
-        # idx_new = np.concatenate((idx_go_new,idx_nogo_new))
-        # X = X[idx_new]
-        # y = y[idx_new]
-
-        pass
-
-    def generate_stratified_K_folds(self, X, y, K):
-        # X, y = self.encode_equal_trials(X, y)
-
+        Returns
+        -------
+        train_validate_pairs : list, shape (K, 2)
+            Stores K train/validate pairs. Each entry in this list is a tuple 
+            with the following format:
+            ((training log ISIs, training trial conditions), 
+            (validation log ISIs, validation trial conditions)) 
+        """
         train_validate_pairs = []
 
         X = np.asarray(X)
@@ -269,20 +318,40 @@ class NDecoder:
             train_validate_pairs.append(((train_X, train_y), (validate_X, validate_y)))
         return train_validate_pairs
 
-    def calculateAccuracy(self, test_X, test_y):
-        # weighted_correct = 0
+    def calculate_accuracy(
+        self, 
+        test_X: ArrayLike, 
+        test_y: ArrayLike) -> tuple[float, float]:
+        """
+        Calculates the accuracy of the decoder on unseen test trial data.
+
+        Parameters
+        ----------
+        test_X : array-like, shape (num trials, num ISIs per trial)
+            Log ISIs for each trial.
+        test_y : array-like, shape (num trials,)
+            Condition of each trial.
+
+        Returns
+        -------
+        accuracy : float
+            Number of correct trial predictions divided by the total number of 
+            predictions made. 
+        frac_empty_ISIs: float
+            Number of predictions made for trials with no ISIs divided by the 
+            total number of predictions made.
+        """
         num_correct = 0
         num_empty_ISIs = 0
         num_preds = 0
         
         for idx, trial in enumerate(test_X):
-            cond, prob_cond, _, empty_ISIs = self._predict_single_trial(self.model, trial)
+            cond, _, _, empty_ISIs = self._predict_single_trial(trial)
             
             if cond is None:
                 continue
 
             if cond == test_y[idx]:
-                # weighted_correct += weights[cond]
                 num_correct += 1
             
             if empty_ISIs:
@@ -290,20 +359,20 @@ class NDecoder:
 
             num_preds += 1
             
-        if num_preds <= 0:
-            # return np.nan,np.nan,np.nan
+        if num_preds == 0:
             return np.nan,np.nan
         else:
-            # return (num_correct/num_preds),(weighted_correct/num_preds),(num_emptyISIs/num_preds)
             return (num_correct/num_preds), (num_empty_ISIs/num_preds)
     
-    def save_as_pickle(self, filename):
-        file = open(filename, 'wb')
+    def save_as_pickle(self, file_path: str):
+        """
+        Saves the decoder as a pickle file. 
+
+        Parameters
+        ----------
+        file_path : str
+            Path to store generated pickle file at.
+        """
+        file = open(file_path, 'wb')
         pickle.dump(self, file)
         file.close()
-
-
-    def fit_transform(self, X):
-        # Implement your fit_transform logic here
-        # Example: transformed_data = self.model.transform(X)
-        pass

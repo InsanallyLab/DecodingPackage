@@ -1,38 +1,44 @@
-from multiprocessing.sharedctypes import Value
 import pynapple as nap 
 import numpy as np  
-
+from typing import Optional, Union
+from numpy.typing import ArrayLike
 
 class UniqueIntervalSet(nap.IntervalSet):
     """
-    A subclass of pynapple.IntervalSet ensuring mutable interval sets. 
-
+    A subclass of pynapple.IntervalSet ensuring mutable interval sets. Allows
+    for optional padding of intervals.
     Ensures that the intervals added to this set are unique and non-overlapping. 
-    Also allows for optional padding of intervals.
     """
 
-    def __init__(self, name, start, end=None, time_units="s", start_padding=None, end_padding=None, **kwargs):
+    def __init__(
+        self, 
+        name: str, 
+        start, 
+        end=None, 
+        time_units: str = "s", 
+        start_padding: Optional[Union[int, float, ArrayLike]] = None, 
+        end_padding: Optional[Union[int, float, ArrayLike]] = None, 
+        **kwargs):
         """
-        UniqueIntervalSet initializer.
-
         Parameters
         ----------
         name : str
             Name of the interval set.
         start : numpy.ndarray or number or pandas.DataFrame or pandas.Series
             Start times of the intervals.
-        end : numpy.ndarray or number or pandas.Series, optional if start is a pandas.DataFrame with start and end values
-            End times of the intervals.
+        end : numpy.ndarray or number or pandas.Series
+            End times of the intervals. 
+            Optional if start is a pandas.DataFrame with start and end values.
         time_units : str, optional (default = 's')
-            The time units in which intervals are specified. Valid options are 'us', 'ms', 's'.
+            The time units in which intervals are specified. 
+            Valid options are 'us', 'ms', 's'.
         start_padding : number, numpy.ndarray, or list, optional
             Padding to add to the start times. Can be a positive or negative value(s).
         end_padding : number, numpy.ndarray, or list, optional
             Padding to add to the end times. Can be a positive or negative value(s).
         **kwargs
-            Additional parameters passed to pandas.DataFrame.
+            Additional parameters passed to IntervalSet initialization.
 
-        
         If padding is passed in, the padded start/end times are stored as the 
         default self.start, self.end values. Unpadded start/end times are stored
         separately in self.unpadded_start, self.unpadded_end.
@@ -76,34 +82,26 @@ class UniqueIntervalSet(nap.IntervalSet):
         start = (self.start + self.start_padding) if self.start_padding is not None else self.start
         end = (self.end + self.end_padding) if self.end_padding is not None else self.end
         super().__init__(start=start, end=end)
-        
-    # def get_padded_interval_set(self):
-    #     """Get the padded intervals.
 
-    #     Returns:
-    #         UniqueIntervalSet: New interval set with padded intervals.
-    #     """
-    #     if self.start_padding is not None:
-    #         padded_start = self.start - self.start_padding
-    #     else:
-    #         padded_start = self.start
-        
-    #     if self.end_padding is not None:
-    #         padded_end = self.end + self.end_padding
-    #     else:
-    #         padded_end = self.end
-
-    #     return UniqueIntervalSet(name=self.name + "_padded", start=padded_start, end=padded_end, time_units=self.time_units)
-
-    def add_interval(self, start, end, start_pad=None, end_pad=None):
+    def add_interval(
+        self, 
+        start: Union[int, float], 
+        end: Union[int, float], 
+        start_pad: Optional[Union[int, float]] = None, 
+        end_pad: Optional[Union[int, float]] = None):
         """
-        Adds an interval to the unique intervals.
+        Adds an interval to the unique interval set.
 
-        Parameters:
-        start (number): (Unpadded) start time of the new interval.
-        end (number): (Unpadded) end time of the new interval.
-        start_pad (number): Padding to add to start time if the interval set is padded.
-        end_pad (number): Padding to add to the end time if the interval set is padded.
+        Parameters
+        ----------
+        start : number
+            (Unpadded) start time of the new interval.
+        end : number 
+            (Unpadded) end time of the new interval.
+        start_pad : number
+            Padding to add to start time if the interval set is padded.
+        end_pad : number 
+            Padding to add to the end time if the interval set is padded.
         """
         if start_pad is not None and self.start_padding is None:
             raise ValueError("IntervalSet does not have start padding. Cannot pass in start padding for new interval.")
@@ -133,20 +131,23 @@ class UniqueIntervalSet(nap.IntervalSet):
         super().__init__(start=new_start_values, end=new_end_values)
 
 
-    def delete_interval(self, start, end):
+    def delete_interval(
+        self, 
+        start: Union[int, float],
+        end: Union[int, float]):
         """
-        Delete a specified interval from the interval set. If the interval set
+        Deletes a specified interval from the interval set. If the interval set
         is padded, pass in the unpadded start/end times as arguments.
 
-        Args:
-            start (number): (Unpadded) start time of the interval to delete.
-            end (number): (Unpadded) end time of the interval to delete.
-
-        Raises:
-            ValueError: If the specified interval does not exist in the interval sets.
+        Parameters
+        ----------
+        start : number
+            (Unpadded) start time of the interval to delete.
+        end : number
+            (Unpadded) end time of the interval to delete.
         """
 
-        # Identify the indices of the intervals to keep (i.e., not delete)
+        # Identify the indices of the intervals to keep (i.e not delete)
         mask = None 
         if self.start_padding is not None:
             if self.end_padding is not None:
