@@ -9,7 +9,7 @@ The repository is structured as follows:
 - `decoder/`: Main directory containing all the essential files and sub-modules.
   - `core/`: Core functionalities and implementations of the NDecoder class.
   - `io/`: Input and output operations related to the decoder.
-  - `main.py`: The main script where the `NDecoder` class is instantiated and utilized.
+  - `workflow.py`: The main script where the `NDecoder` class is instantiated and utilized.
 
 ## Getting Started
 
@@ -29,8 +29,8 @@ The repository is structured as follows:
 For a deep dive into the methods, parameters, and return values, check the comments and docstrings provided in the source files.
 
 - Core functionalities: `decoder/core`
-- IO Operations: `decoder/io`
-- Main implementation and usage examples: `decoder/main.py`
+- IO operations: `decoder/io`
+- Main implementation and usage examples: `decoder/workflow.py`
 
 ## Contributing
 
