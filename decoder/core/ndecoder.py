@@ -31,11 +31,11 @@ class NDecoder:
     """
     def __init__(
         self, 
-        bandwidth: float, 
+        bw: float, 
         min_ISIs: int, 
         conditions: ArrayLike):
 
-        self.bw = bandwidth
+        self.bw = bw
         self.min_ISIs = min_ISIs
         self.conditions = conditions
         self.model = Model(conditions) 
@@ -79,7 +79,7 @@ class NDecoder:
         return condition_subset_mapping
 
     @staticmethod
-    def estimate_isi_distribution(log_ISIs: NDArray, bandwidth: float):
+    def estimate_ISI_distribution(log_ISIs: NDArray, bw: float):
         """
         Estimates Inter-Spike Interval (ISI) distributions using Kernel Density
         Estimation (KDE).
@@ -88,7 +88,7 @@ class NDecoder:
         ----------
         log_ISIs : numpy.ndarray 
             An array of log-transformed ISI values.
-        bandwidth : float
+        bw : float
             The kernel bandwidth for KDE.
 
         Returns
@@ -99,10 +99,13 @@ class NDecoder:
             Represents the estimated inverse Cumulative Distribution Function 
             (CDF) for sampling.
         """
-        # TODO: write x in relation to fftkde data's min and max
         x = np.linspace(-2, 20, 100)
-
-        fftkde = FFTKDE(bw=bandwidth, kernel='gaussian').fit(log_ISIs, weights=None)
+        
+        fftkde = FFTKDE(bw=bw, kernel='gaussian').fit(log_ISIs, weights=None)
+        # min_fftkde_data = np.min(fftkde.data, axis=0)
+        # max_fftkde_data = np.max(fftkde.data, axis=0)
+        
+        # x = np.linspace(int(min_fftkde_data) - 1, int(max_fftkde_data) + 1, 100)
 
         y = fftkde.evaluate(x)
 
@@ -150,7 +153,8 @@ class NDecoder:
             print("Insufficient LogISIs data after flattening for analysis.")
             return None
 
-        f,inv_f = self.estimate_isi_distribution(log_ISIs_concat, self.bw)
+        # TODO: add error handling: if KDE throws data out of range error 
+        f,inv_f = self.estimate_ISI_distribution(log_ISIs_concat, self.bw)
         self.model.set_all(f, inv_f) 
 
         # Handle individual conditions
@@ -165,7 +169,7 @@ class NDecoder:
                 print(f"Skipping fold. Not enough ISIs for the {label} condition")
                 return None
             # Uses Gaussian KDE
-            f,inv_f = self.estimate_isi_distribution(logISIs_concat, self.bw)
+            f,inv_f = self.estimate_ISI_distribution(logISIs_concat, self.bw)
             prior_0 = 1.0 / len(self.conditions)
 
             # Calculate likelihood for 0-ISI trials
