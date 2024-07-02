@@ -51,11 +51,11 @@ class Session:
 
         self.iset_to_spikes = {} # Maps interval_name -> spikes Ts
         self.interval_to_spikes = {} # Maps interval_name -> start, end -> spikes Ts
-        self.iset_to_log_ISIs = {} # Maps interval_name -> 2D list of log ISIs
+        self.iset_to_log_ISIs = {} # Maps interval_name -> np array of log ISIs
 
         self.locked_iset_to_spikes = {} # Maps (event_name, interval_name) -> spikes Ts
         self.locked_interval_to_spikes = {} # Maps (event_name, interval_name) -> start, end -> spikes Ts
-        self.locked_iset_to_log_ISIs = {} # Maps (event_name, interval_name) -> 2D list of log ISIs
+        self.locked_iset_to_log_ISIs = {} # Maps (event_name, interval_name) -> np array of log ISIs
 
     def slice_spikes_by_intervals(self, iset_name: str):
         """
