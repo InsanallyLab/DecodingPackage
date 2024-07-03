@@ -31,6 +31,20 @@ class Session:
             self.spike_train = spike_times
         
         # CHANGED: dict of IntervalSets instead of list of IntervalSets
+        if not isinstance(interval_sets, dict):
+            raise TypeError("interval_sets must be a dict.")
+        if not all(isinstance(key, str) for key in interval_sets.keys()):
+            raise TypeError("All keys in interval_sets dict must be strings.")
+        if not all(isinstance(val, nap.IntervalSet) for val in interval_sets.values()):
+            raise TypeError("All values in interval_sets dict must be nap.IntervalSet.")
+        
+        if not isinstance(event_sets, dict):
+            raise TypeError("event_sets must be a dict.")
+        if not all(isinstance(key, str) for key in event_sets.keys()):
+            raise TypeError("All keys in event_sets dict must be strings.")
+        if not all(isinstance(val, nap.Tsd) for val in event_sets.values()):
+            raise TypeError("All values in event_sets dict must be nap.Tsd.")
+
         self.interval_sets = interval_sets
         # CHANGED: dict of Tsd instead of list of EventSets 
         self.event_sets = event_sets
@@ -56,6 +70,8 @@ class Session:
         iset_name : str
             The name of the IntervalSet to restrict the spikes to.
         """
+        if iset_name not in self.interval_sets:
+            raise KeyError("Interval set name does not exist")
 
         # Fetch the desired interval set (padded if padding has been added to the object).
         interval_set = self.interval_sets[iset_name]
@@ -107,14 +123,6 @@ class Session:
         numpy.ndarray: 2D array containing logISIs for the specified interval 
         set. Shape is (num trials, num ISIs per trial)
         """
-
-        if iset_name not in self.interval_sets:
-            raise KeyError("Interval set name doesn't exist")
-        
-        if lock_point is not None:
-            if lock_point not in ['start', 'end'] and lock_point not in self.event_sets:
-                raise KeyError("Invalid lock point")
-
         log_ISIs_agg = []
         interval_set = self.interval_sets[iset_name]
 
@@ -136,14 +144,14 @@ class Session:
             
             # Scaling the spikes using numpy's vectorized operation
             scaled_spikes = spikes * scaling_factor
-            
+
             interval_ISIs = np.diff(scaled_spikes)
             
             # Condition to check for non-empty interval_ISIs before applying log
             # Only apply log to entries that are greater than zero 
             interval_log_ISIs = np.log10(interval_ISIs, out=np.zeros(interval_ISIs.shape), where=(interval_ISIs > 0)) if interval_ISIs.size != 0 else np.array([])
             log_ISIs_agg.append(interval_log_ISIs)
-
+            
         # Store log_ISIs for the current iset_name in the dictionary
         if lock_point is not None:
             self.locked_iset_to_log_ISIs[(lock_point, iset_name)] = np.array(log_ISIs_agg, dtype='object')
@@ -171,9 +179,13 @@ class Session:
             Either 'start' or 'end', indicating whether spikes should be 
             time-locked to the start or the end of their interval. 
         """
+        if iset_name not in self.interval_sets:
+            raise KeyError("Interval set name does not exist")
+        if iset_name not in self.interval_to_spikes:
+            raise KeyError("Spikes have not been mapped to this interval set. Run slice_spikes_by_intervals first.")
         
         if lock_point not in ['start', 'end']:
-            raise ValueError("'lock_point' should be either 'start' or 'end'")
+            raise ValueError("lock_point should be either 'start' or 'end'")
 
         # Return if result is already computed and stored.
         if (lock_point, iset_name) in self.locked_iset_to_spikes:
@@ -224,11 +236,11 @@ class Session:
         matched_events = {}
         for start, end in self.interval_to_spikes[iset_name].keys():
             # CHANGED: Tsd instead of EventSet
-            events_in_interval = event_set.get(start=start, end=end).t
+            events_in_interval = event_set.get(start=start, end=end)
 
             if len(events_in_interval) != 1:
-                raise ValueError(f"Interval ({start}, {end}) doesn't match exactly one event in event_set.")
-            matched_events[(start, end)] = events_in_interval[0]
+                raise ValueError(f"Interval ({start}, {end}) does not match exactly one event in event_set.")
+            matched_events[(start, end)] = events_in_interval.t[0]
 
         return matched_events
 
@@ -249,6 +261,13 @@ class Session:
         iset_name : str 
             Name of the interval set for which spike trains should be time-locked.
         """
+        if iset_name not in self.interval_sets:
+            raise KeyError("Interval set name does not exist")
+        if iset_name not in self.interval_to_spikes:
+            raise KeyError("Spikes have not been mapped to this interval set. Run slice_spikes_by_intervals first.")
+        
+        if eset_name not in self.event_sets:
+            raise KeyError("Event set name passed in as lock point does not exist")
 
         # Return if result is already computed and stored.
         if (eset_name, iset_name) in self.locked_iset_to_spikes:
@@ -294,7 +313,7 @@ class Session:
             if (lock_point, iset_name) not in self.locked_iset_to_spikes:
                 raise KeyError("Invalid lock point, or spikes have not been mapped to this interval set and lock point")
         elif iset_name not in self.iset_to_spikes:
-            raise KeyError("Interval set doesn't exist, or spikes have not been mapped to this interval set")
+            raise KeyError("Interval set does not exist, or spikes have not been mapped to this interval set")
 
         self._validate_file_path(file_path)
         if lock_point is not None:
@@ -328,7 +347,7 @@ class Session:
             if (lock_point, iset_name) not in self.locked_iset_to_log_ISIs:
                 raise KeyError("Invalid lock point, or log ISIs have not been computed for this interval and lock point")
         elif iset_name not in self.iset_to_log_ISIs:
-            raise KeyError("Interval set doesn't exist, or log ISIs have not been computed for this interval set")
+            raise KeyError("Interval set does not exist, or log ISIs have not been computed for this interval set")
 
         self._validate_file_path(file_path)
         if lock_point is not None:
@@ -355,5 +374,5 @@ class Session:
             raise RuntimeError(f"{file_path} is a directory.")
         directory = os.path.dirname(file_path)
         if directory and not os.path.exists(directory):
-            raise RuntimeError(f"Path {directory} doesn't exist.")
+            raise RuntimeError(f"Path {directory} does not exist.")
 
