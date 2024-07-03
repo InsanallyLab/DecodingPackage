@@ -15,6 +15,8 @@ def normal_pdf(x):
 def uniform_pdf(x):
     a = 0
     b = 1
+    if x < a or x > b:
+        return 0 
     return 1.0 / (b - a)
 
 def uniform_inverse_cdf(x):

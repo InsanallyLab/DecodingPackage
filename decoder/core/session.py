@@ -267,7 +267,7 @@ class Session:
             raise KeyError("Spikes have not been mapped to this interval set. Run slice_spikes_by_intervals first.")
         
         if eset_name not in self.event_sets:
-            raise KeyError("Event set name does not exist")
+            raise KeyError("Event set name passed in as lock point does not exist")
 
         # Return if result is already computed and stored.
         if (eset_name, iset_name) in self.locked_iset_to_spikes:
