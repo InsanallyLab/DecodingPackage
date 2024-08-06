@@ -134,7 +134,8 @@ def test_ndecoder_fit(mocker):
     mock_interp1d = mocker.patch("decoder.core.ndecoder.interp1d")
     mock_interp1d.return_value = lambda x : 0.1 * x
 
-    model = decoder.fit(X, y)
+    decoder.fit(X, y)
+    model = decoder.model
     assert model.all.pdf(3) == 0.1*3
     assert model.all.pdf(-1.9) == 0.1*-1.9
     assert model.all.inv_cdf(0.4) == 0.1*0.4
@@ -167,8 +168,16 @@ def test_ndecoder_fit_insufficient_ISIs(mocker):
     mock_interp1d = mocker.patch("decoder.core.ndecoder.interp1d")
     mock_interp1d.return_value = lambda x : 0.1 * x
 
-    model = decoder.fit(X, y)
-    assert model == None
+    decoder.fit(X, y)
+    assert decoder.model.all.pdf == None
+    assert decoder.model.all.inv_cdf == None
+    assert decoder.model.all.prior_0 == None
+    assert decoder.model.all.prior_empty == None
+    for cond in conditions:
+        assert decoder.model.conds[cond].pdf == None
+        assert decoder.model.conds[cond].inv_cdf == None
+        assert decoder.model.conds[cond].prior_0 == None
+        assert decoder.model.conds[cond].prior_empty == None
     
 def test_ndecoder_fit_empty_ISIs(mocker):
     bw = 0.1
@@ -185,7 +194,8 @@ def test_ndecoder_fit_empty_ISIs(mocker):
     mock_interp1d = mocker.patch("decoder.core.ndecoder.interp1d")
     mock_interp1d.return_value = lambda x : 0.1 * x
 
-    model = decoder.fit(X, y)
+    decoder.fit(X, y)
+    model = decoder.model
     assert model.all.pdf(3) == 0.1*3
     assert model.all.pdf(-1.9) == 0.1*-1.9
     assert model.all.inv_cdf(0.4) == 0.1*0.4

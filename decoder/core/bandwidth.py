@@ -1,5 +1,6 @@
 import numpy as np 
-from sklearn.model_selection import GridSearchCV 
+from sklearn.experimental import enable_halving_search_cv
+from sklearn.model_selection import GridSearchCV, HalvingGridSearchCV, HalvingRandomSearchCV, RandomizedSearchCV
 from sklearn.neighbors import KernelDensity 
 from numpy.typing import NDArray
 from typing import Optional
@@ -40,10 +41,12 @@ class Bandwidth():
         if bandwidth_range is None:
             bandwidth_range = Bandwidth.getBWs_elife2019()
 
+        # grid = HalvingRandomSearchCV(KernelDensity(kernel='gaussian'),
+        #                     {'bandwidth': bandwidth_range},
+        #                     cv=folds, n_jobs=-1, random_state=0)
         grid = GridSearchCV(KernelDensity(kernel='gaussian'),
                             {'bandwidth': bandwidth_range},
-                            cv=folds, 
-                            verbose=10, n_jobs=-1)
+                            cv=folds, n_jobs=-1)
         grid.fit(log_ISIs)
         return grid.best_params_['bandwidth']
   
