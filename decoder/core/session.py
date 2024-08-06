@@ -1,8 +1,10 @@
+from cmath import nan
 import os
 import numpy as np
 import pynapple as nap
 from typing import Union, Optional
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
+from decoder.core.unique_interval_set import UniqueIntervalSet
 
 class Session:
     """ Preprocesses spike train data and computes log ISIs."""
@@ -16,7 +18,7 @@ class Session:
         Parameters
         ----------
         spike_times : array-like or nap.Ts
-            Spike times for the session. 
+            Spike times for the session (one dimensional) 
         interval_sets : dict[str, nap.IntervalSet]
             Dict of interval sets for the session. The keys are the name of 
             each interval set. 
@@ -30,7 +32,6 @@ class Session:
         else:
             self.spike_train = spike_times
         
-        # CHANGED: dict of IntervalSets instead of list of IntervalSets
         if not isinstance(interval_sets, dict):
             raise TypeError("interval_sets must be a dict.")
         if not all(isinstance(key, str) for key in interval_sets.keys()):
@@ -46,24 +47,26 @@ class Session:
             raise TypeError("All values in event_sets dict must be nap.Tsd.")
 
         self.interval_sets = interval_sets
-        # CHANGED: dict of Tsd instead of list of EventSets 
         self.event_sets = event_sets
 
-        self.iset_to_spikes = {} # Maps interval_name -> spikes Ts
-        self.interval_to_spikes = {} # Maps interval_name -> start, end -> spikes Ts
-        self.iset_to_log_ISIs = {} # Maps interval_name -> np array of log ISIs
+        self.interval_to_spikes = {} # Maps iset_name -> start, end -> spikes Ts
+        self.locked_interval_to_spikes = {} # Maps (event_name, iset_name) -> start, end -> spikes Ts
+        self.interval_to_padded_spikes = {} # Maps iset_name -> start, end -> padded spikes Ts
+        self.locked_interval_to_padded_spikes = {} # Maps (event_name, iset_name) -> start, end -> padded spikes Ts
 
-        self.locked_iset_to_spikes = {} # Maps (event_name, interval_name) -> spikes Ts
-        self.locked_interval_to_spikes = {} # Maps (event_name, interval_name) -> start, end -> spikes Ts
-        self.locked_iset_to_log_ISIs = {} # Maps (event_name, interval_name) -> np array of log ISIs
+        self.iset_to_log_ISIs = {} # Maps iset_name -> np 2D array of log ISIs
+        self.locked_iset_to_log_ISIs = {} # Maps (event_name, iset_name) -> np array of log ISIs
+
+        self.iset_to_windows = {} # Maps iset_name -> np array of windows
+        self.iset_to_windowed_log_ISIs = {} # Maps iset_name -> np array of windowed log ISIs
 
     def slice_spikes_by_intervals(self, iset_name: str):
         """
-        Restricts spike data to a specified interval and caches the result.
-
-        This function restricts spike data to a given interval defined by the 
-        provided interval name. If the results have been previously computed, 
-        they are retrieved from cache to speed up the process.
+        Restricts spike data to a specified interval set. 
+        Maps each interval in the interval set to the spikes contained within 
+        that interval. If interval set is a padded UniqueIntervalSet, this 
+        function also maps each interval to the spikes contained within the 
+        padded interval.
 
         Parameters
         ----------
@@ -73,29 +76,32 @@ class Session:
         if iset_name not in self.interval_sets:
             raise KeyError("Interval set name does not exist")
 
-        # Fetch the desired interval set (padded if padding has been added to the object).
         interval_set = self.interval_sets[iset_name]
         
         # Return if result is already computed and stored.
-        if iset_name in self.iset_to_spikes:
+        if iset_name in self.interval_to_spikes:
             return
-        
-        # Restrict the spike train to the interval.
-        restricted_spikes = self.spike_train.restrict(interval_set)
 
-        # Initialize a storage for mapped spikes if not present.
-        if iset_name not in self.interval_to_spikes: 
-            self.interval_to_spikes[iset_name] = {}
+        self.interval_to_spikes[iset_name] = {}
+
+        if isinstance(interval_set, UniqueIntervalSet):
+            if interval_set.padded_start is not None or interval_set.padded_end is not None:
+                self.interval_to_padded_spikes[iset_name] = {}
         
         # Iterate through the intervals and map spikes.
-        for start, end in zip(interval_set.start, interval_set.end):
-            # CHANGED: for spike train as Ts
-            interval_spikes = restricted_spikes.get(start=start, end=end)
-
+        for idx in range(len(interval_set.start)):
+            start, end = interval_set.start[idx], interval_set.end[idx]
+            interval_spikes = self.spike_train.get(start=start, end=end)
             self.interval_to_spikes[iset_name][(start, end)] = interval_spikes
-        
-        # Cache the result for future use.
-        self.iset_to_spikes[iset_name] = restricted_spikes
+
+            # Map padded spikes to interval if needed.
+            if isinstance(interval_set, UniqueIntervalSet):
+                if interval_set.padded_start is not None or interval_set.padded_end is not None:
+                    padded_start = interval_set.padded_start[idx] if interval_set.padded_start is not None else start
+                    padded_end = interval_set.padded_end[idx] if interval_set.padded_end is not None else end
+
+                    padded_interval_spikes = self.spike_train.get(start=padded_start, end=padded_end)
+                    self.interval_to_padded_spikes[iset_name][(start, end)] = padded_interval_spikes
 
     def compute_log_ISIs(
         self, 
@@ -103,7 +109,7 @@ class Session:
         lock_point: Optional[str] = None, 
         scaling_factor: Union[int, float] = 1000):
         """
-        Computes log ISIs for a specific interval set and stores them.
+        Computes log ISIs for a specific interval set.
         If a lock point is passed in, the function first time-locks the spike 
         train to that lock point in each interval before computing log ISIs.
 
@@ -120,8 +126,8 @@ class Session:
 
         Returns
         -------
-        numpy.ndarray: 2D array containing logISIs for the specified interval 
-        set. Shape is (num trials, num ISIs per trial)
+        log_ISIs : ndarray, shape (num trials, num ISIs per trial)
+            2D array containing log ISIs for the specified interval set. 
         """
         log_ISIs_agg = []
         interval_set = self.interval_sets[iset_name]
@@ -160,6 +166,151 @@ class Session:
         self.iset_to_log_ISIs[iset_name] = np.array(log_ISIs_agg, dtype='object')
         return self.iset_to_log_ISIs[iset_name]
 
+    def _final_spike_in_trials(
+        self,
+        iset_name: str, 
+        lock_point: str):
+        """
+        Returns the (time-locked) final spike contained in each interval in 
+        the interval set.
+
+        Parameters
+        ----------
+        iset_name : str
+            Name of the interval set to find final spikes for.
+        lock_point : str
+            Lock point that the interval set is already time-locked to.
+
+        Returns
+        -------
+        final_spikes_agg : ndarray, shape (num trials, )
+            Array containing the final spike in each trial.
+        """
+        final_spikes_agg = []
+
+        for _, spikes in self.locked_interval_to_spikes[(lock_point, iset_name)].items():
+            spikes = spikes.t
+            if len(spikes) == 0:
+                final_spikes_agg.append(nan)
+            else:
+                final_spikes_agg.append(spikes[-1])
+        return np.array(final_spikes_agg)
+
+    def compute_windowed_log_ISIs(
+        self, 
+        iset_name: str,
+        window_len: float = 1.0, 
+        step: float = 0.1,
+        scaling_factor: Union[int, float] = 1000):
+        """
+        Computes log ISIs for a specific interval set using sliding windows.
+        The function first time-locks the spike train to the start of each
+        interval, then generates sliding windows across each interval 
+        and computes log ISIs for each sliding window.
+
+        Parameters
+        ----------
+        iset_name : str
+            Name of the interval set to compute log ISIs for.
+        window_len : float (default = 1.0)
+            The length of each sliding window (in seconds).
+        step : float (default = 0.1)
+            The step size between sliding windows (in seconds).
+        scaling_factor : int or float (default = 1000)
+            Factor to scale the spike times.
+
+        Returns
+        -------
+        windowed_log_ISIs : ndarray, shape (num trials, num sliding windows in trial, num ISIs per window)
+            Contains log ISIs for each sliding window in each interval.
+        windows : ndarray, shape (num sliding windows, )
+            The sliding windows used across all intervals in the interval set. 
+            Note that each interval may not use all of the sliding windows in 
+            this array, depending on its duration.
+        final_spikes : ndarray, shape (num trials, )
+            The final (time-locked) spike in each trial.
+        """
+        interval_set = self.interval_sets[iset_name]
+        lock_point = 'start'
+
+        self.slice_spikes_by_intervals(iset_name=iset_name)
+
+        self.time_lock_to_interval(iset_name=iset_name, lock_point=lock_point)
+
+        final_spikes = self._final_spike_in_trials(iset_name=iset_name, lock_point=lock_point)
+        
+        windows_agg = []
+        max_num_windows = 0
+        windowed_log_ISIs_agg = []
+
+        # If interval set is padded, compute sliding windows to cover entire padded interval.
+        if (lock_point, iset_name) in self.locked_interval_to_padded_spikes:
+            for idx in range(len(interval_set.start)):
+                start, end = interval_set.start[idx], interval_set.end[idx]
+                spikes = self.locked_interval_to_padded_spikes[(lock_point, iset_name)][(start, end)]
+
+                padded_start = interval_set.padded_start[idx]
+                padded_end = interval_set.padded_end[idx]
+
+                first_window_center = padded_start - start + (window_len / 2.) # - start since spikes are time-locked to start
+                last_window_center = padded_end - start - (window_len / 2.) # - start since spikes are time-locked to start
+                windows = [(i - window_len / 2., i + window_len / 2.) for i in np.arange(first_window_center, last_window_center + step, step)]
+                
+                if len(windows) > max_num_windows:
+                    max_num_windows = len(windows)
+                    windows_agg = windows
+
+                trial_windowed_log_ISIs = []
+
+                for w_start, w_end in windows:
+                    window_spikes = spikes.get(w_start, w_end)
+                    window_spikes = window_spikes.t
+
+                    scaled_spikes = window_spikes * scaling_factor
+
+                    interval_ISIs = np.diff(scaled_spikes)
+                    
+                    # Condition to check for non-empty interval_ISIs before applying log
+                    # Only apply log to entries that are greater than zero 
+                    interval_log_ISIs = np.log10(interval_ISIs, out=np.zeros(interval_ISIs.shape), where=(interval_ISIs > 0)) if interval_ISIs.size != 0 else np.array([])
+                    
+                    trial_windowed_log_ISIs.append(interval_log_ISIs)
+
+                windowed_log_ISIs_agg.append(trial_windowed_log_ISIs)
+        else:
+            # Interval set is not padded. Compute sliding windows that are contained entirely within interval.
+            for (start, end), spikes in self.locked_interval_to_spikes[(lock_point, iset_name)].items():
+                first_window_center = window_len / 2. # - start since spikes are time-locked to start
+                last_window_center = end - start - (window_len / 2.) # - start since spikes are time-locked to start
+                windows = [(i - window_len / 2., i + window_len / 2.) for i in np.arange(first_window_center, last_window_center + step, step)]
+                
+                if len(windows) > max_num_windows:
+                    max_num_windows = len(windows)
+                    windows_agg = windows
+
+                trial_windowed_log_ISIs = []
+
+                for w_start, w_end in windows:
+                    window_spikes = spikes.get(w_start, w_end)
+                    window_spikes = window_spikes.t
+
+                    scaled_spikes = window_spikes * scaling_factor
+
+                    interval_ISIs = np.diff(scaled_spikes)
+                    
+                    # Condition to check for non-empty interval_ISIs before applying log
+                    # Only apply log to entries that are greater than zero 
+                    interval_log_ISIs = np.log10(interval_ISIs, out=np.zeros(interval_ISIs.shape), where=(interval_ISIs > 0)) if interval_ISIs.size != 0 else np.array([])
+                    
+                    trial_windowed_log_ISIs.append(interval_log_ISIs)
+
+                windowed_log_ISIs_agg.append(trial_windowed_log_ISIs)
+        
+        self.iset_to_windows[iset_name] = np.array(windows_agg)
+        self.iset_to_windowed_log_ISIs[iset_name] = np.array(windowed_log_ISIs_agg, dtype='object')
+
+        return self.iset_to_windowed_log_ISIs[iset_name], self.iset_to_windows[iset_name], final_spikes
+
 
     def time_lock_to_interval(self, iset_name: str, lock_point: str):
         """
@@ -168,9 +319,12 @@ class Session:
         
         This function treats the start/end of the interval as the new 'zero', 
         and shifts the spike times accordingly. It then stores the time-locked
-        spike trains in self.locked_iset_to_spikes and 
-        self.locked_interval_to_spikes.
+        spike trains in self.locked_interval_to_spikes.
         
+        If the interval set is padded, this function also time-locks the padded
+        spike trains to the start/end of their interval, and stores them in
+        self.locked_interval_to_padded_spikes.
+
         Parameters
         ----------
         iset_name : str
@@ -188,17 +342,15 @@ class Session:
             raise ValueError("lock_point should be either 'start' or 'end'")
 
         # Return if result is already computed and stored.
-        if (lock_point, iset_name) in self.locked_iset_to_spikes:
+        if (lock_point, iset_name) in self.locked_interval_to_spikes:
             return
-
-        locked_spikes_agg = []
 
         for (start, end), spikes in self.interval_to_spikes[iset_name].items():
             if lock_point == 'start':
                 time_adjustment = start
             else:
                 time_adjustment = end
-            
+                
             # Adjust spike times based on the lock point
             locked_spikes = [spike - time_adjustment for spike in spikes.t]
             
@@ -207,12 +359,23 @@ class Session:
             if key not in self.locked_interval_to_spikes:
                 self.locked_interval_to_spikes[key] = {}
             self.locked_interval_to_spikes[key][(start, end)] = nap.Ts(t=np.array(locked_spikes))
-            
-            locked_spikes_agg.extend(locked_spikes)
-
-        # Convert the accumulated spikes into a Ts object and store
-        tsd_obj = nap.Ts(t=np.array(locked_spikes_agg))
-        self.locked_iset_to_spikes[(lock_point, iset_name)] = tsd_obj
+        
+        # If interval set is padded, also time-locks the padded spike trains.
+        if iset_name in self.interval_to_padded_spikes:
+            for (start, end), spikes in self.interval_to_padded_spikes[iset_name].items():
+                if lock_point == 'start':
+                    time_adjustment = start
+                else:
+                    time_adjustment = end
+                    
+                # Adjust spike times based on the lock point
+                locked_spikes = [spike - time_adjustment for spike in spikes.t]
+                
+                # Store in the mapped structure
+                key = (lock_point, iset_name)
+                if key not in self.locked_interval_to_padded_spikes:
+                    self.locked_interval_to_padded_spikes[key] = {}
+                self.locked_interval_to_padded_spikes[key][(start, end)] = nap.Ts(t=np.array(locked_spikes))
 
 
     def _match_event_to_interval(self, event_set: nap.Tsd, iset_name: str) -> dict:
@@ -230,12 +393,12 @@ class Session:
 
         Returns
         -------
-        dict: Maps each interval to the timestamp of its corresponding event.
+        matched_events : dict
+            Maps each interval to the timestamp of its corresponding event.
 
         """
         matched_events = {}
         for start, end in self.interval_to_spikes[iset_name].keys():
-            # CHANGED: Tsd instead of EventSet
             events_in_interval = event_set.get(start=start, end=end)
 
             if len(events_in_interval) != 1:
@@ -251,8 +414,11 @@ class Session:
 
         This function treats the event occuring in the interval as the new 
         'zero', and shifts the spike times accordingly. It then stores the 
-        time-locked spike trains in self.locked_iset_to_spikes and 
-        self.locked_interval_to_spikes.
+        time-locked spike trains in self.locked_interval_to_spikes.
+
+        If the interval set is padded, this function also time-locks the padded
+        spike trains to the event time, and stores them in
+        self.locked_interval_to_padded_spikes.
 
         Parameters
         ----------
@@ -270,12 +436,11 @@ class Session:
             raise KeyError("Event set name passed in as lock point does not exist")
 
         # Return if result is already computed and stored.
-        if (eset_name, iset_name) in self.locked_iset_to_spikes:
+        if (eset_name, iset_name) in self.locked_interval_to_spikes:
             return
 
         event_set = self.event_sets[eset_name]
         matched_events = self._match_event_to_interval(event_set, iset_name)
-        locked_spikes_agg = []
 
         for (start, end), spikes in self.interval_to_spikes[iset_name].items():
             event_time = matched_events[(start, end)]
@@ -286,41 +451,16 @@ class Session:
                 self.locked_interval_to_spikes[key] = {}
             self.locked_interval_to_spikes[key][(start, end)] = nap.Ts(t=np.array(locked_spikes))
 
-            locked_spikes_agg.extend(locked_spikes)
+        # If interval set is padded, also time-locks the padded spike trains.
+        if iset_name in self.interval_to_padded_spikes:
+            for (start, end), spikes in self.interval_to_padded_spikes[iset_name].items():
+                event_time = matched_events[(start, end)]
+                locked_spikes = [spike - event_time for spike in spikes.t]
 
-        self.locked_iset_to_spikes[(eset_name, iset_name)] = nap.Ts(t=np.array(locked_spikes_agg))
-
-
-    def save_spikes(self, iset_name: str, file_path: str, lock_point: Optional[str] = None):
-        """
-        Saves spike train for a specific interval set to a .npz file. 
-        If a lock point is provided, it saves the time-locked spike train instead.
-
-        Parameters
-        ----------
-        iset_name : str
-            Name of the interval set to save a spike train for.
-        eset_name : str, optional
-            Name of the lock point (an event set, or the start/end of the 
-            interval) to time lock to.
-        file_path : str 
-            Path to save the spike train .npz file at.
-
-        Loading Example:
-            spike_train = nap.load_file(file_path)
-        """
-        if lock_point is not None:
-            if (lock_point, iset_name) not in self.locked_iset_to_spikes:
-                raise KeyError("Invalid lock point, or spikes have not been mapped to this interval set and lock point")
-        elif iset_name not in self.iset_to_spikes:
-            raise KeyError("Interval set does not exist, or spikes have not been mapped to this interval set")
-
-        self._validate_file_path(file_path)
-        if lock_point is not None:
-            self.locked_iset_to_spikes[(lock_point, iset_name)].save(file_path)
-        else:
-            self.iset_to_spikes[iset_name].save(file_path)
-
+                key = (eset_name, iset_name)
+                if key not in self.locked_interval_to_padded_spikes:
+                    self.locked_interval_to_padded_spikes[key] = {}
+                self.locked_interval_to_padded_spikes[key][(start, end)] = nap.Ts(t=np.array(locked_spikes))
 
     def save_log_ISIs(self, iset_name: str, file_path: str, lock_point: Optional[str] = None):
         """

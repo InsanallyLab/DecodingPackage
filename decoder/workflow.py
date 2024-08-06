@@ -1,4 +1,5 @@
 from core.ndecoder import NDecoder
+from core.bandwidth import Bandwidth
 import numpy as np
 from tests.io.test_io import test_saving_loading_ndecoder, test_saving_loading_log_ISIs, test_saving_loading_spikes, test_pickle_to_pynapple
     
@@ -20,6 +21,9 @@ def run_workflow():
 
     print("Done making train Session object")
 
+    print("LOOK HERE")
+    print(conditions_train)
+
     log_ISIs_train = train_session.compute_log_ISIs(iset_name="train trials", lock_point="start")
     print("Done computing train log_ISIs")
 
@@ -38,13 +42,12 @@ def run_workflow():
         lock_point="start")
 
     log_ISIs_concat = np.concatenate(log_ISIs_train)
-    bw_folds = 10    # from Insanally paper
-    # TODO: grid_search is taking too long
-    # kde_bw = Bandwidth.sklearn_grid_search_bw(log_ISIs_concat, bw_folds)
-    kde_bw = 0.20
+    bw_folds = 10   # from Insanally paper
+    kde_bw = Bandwidth.sklearn_grid_search_bw(log_ISIs_concat, bw_folds)
+    # kde_bw = 0.065
     print("KDE bandwidth: ", kde_bw)
 
-    min_ISIs = 0 
+    min_ISIs = 0
     possible_conditions = ["target", "non-target"]
     n_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
     print("NDecoder made")
@@ -52,7 +55,7 @@ def run_workflow():
     reps = 2    # 124 in Insanally paper
     K_fold_num = 2  # 10 in Insanally paper
     accuracy_per_fold = []
-    frac_emptyISIs_per_fold = []
+    frac_empty_ISIs_per_fold = []
 
     conditions_train = np.asarray(conditions_train.values, dtype=str)
 
@@ -60,21 +63,21 @@ def run_workflow():
         train_validate_pairs = n_decoder.generate_stratified_K_folds(log_ISIs_train, conditions_train, K_fold_num)
         print("Generated stratified folds")
 
-        for K, (train_data, validate_data) in enumerate(train_validate_pairs):
+        for k, (train_data, validate_data) in enumerate(train_validate_pairs):
             train_X, train_y = train_data
             n_decoder.fit(train_X, train_y)
-            print("Model fit on fold: %d, rep: %d" %(K, rep))
+            print("Model fit on fold: %d, rep: %d" %(k, rep))
 
             # Compute fold validation accuracy 
             validate_X, validate_y = validate_data
             accuracy, frac_empty = n_decoder.calculate_accuracy(validate_X, validate_y)
             print("Calculated validation accuracy: %f, fraction empty ISIs: %f" %(accuracy, frac_empty))
             accuracy_per_fold.append(accuracy)
-            frac_emptyISIs_per_fold.append(frac_empty)
+            frac_empty_ISIs_per_fold.append(frac_empty)
 
     print("Model fitting complete")
     mean_accuracy = np.nanmean(accuracy_per_fold)
-    mean_frac_empty = np.nanmean(frac_emptyISIs_per_fold)
+    mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
     print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
 
     # Testing model on unseen data
