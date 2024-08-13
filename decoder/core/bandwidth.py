@@ -9,7 +9,8 @@ from typing import Optional
 class Bandwidth(): 
     @staticmethod
     def getBWs_elife2019():
-        return np.linspace(.005, 0.305, 11) 
+        # return np.linspace(.005, 0.305, 11) 
+        return np.linspace(.010, .500, 50)
 
     @staticmethod
     def sklearn_grid_search_bw(

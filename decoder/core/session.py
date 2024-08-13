@@ -249,13 +249,19 @@ class Session:
                 start, end = interval_set.start[idx], interval_set.end[idx]
                 spikes = self.locked_interval_to_padded_spikes[(lock_point, iset_name)][(start, end)]
 
-                padded_start = interval_set.padded_start[idx]
-                padded_end = interval_set.padded_end[idx]
+                if interval_set.padded_start is not None:
+                    padded_start = interval_set.padded_start[idx]
+                else:
+                    padded_start = start
+                if interval_set.padded_end is not None:
+                    padded_end = interval_set.padded_end[idx]
+                else:
+                    padded_end = end
 
                 first_window_center = padded_start - start + (window_len / 2.) # - start since spikes are time-locked to start
                 last_window_center = padded_end - start - (window_len / 2.) # - start since spikes are time-locked to start
                 windows = [(i - window_len / 2., i + window_len / 2.) for i in np.arange(first_window_center, last_window_center + step, step)]
-                
+
                 if len(windows) > max_num_windows:
                     max_num_windows = len(windows)
                     windows_agg = windows
@@ -283,7 +289,7 @@ class Session:
                 first_window_center = window_len / 2. # - start since spikes are time-locked to start
                 last_window_center = end - start - (window_len / 2.) # - start since spikes are time-locked to start
                 windows = [(i - window_len / 2., i + window_len / 2.) for i in np.arange(first_window_center, last_window_center + step, step)]
-                
+
                 if len(windows) > max_num_windows:
                     max_num_windows = len(windows)
                     windows_agg = windows

@@ -24,11 +24,15 @@ PFC_choice_accuracies = []
 AC_choice_pval_s = []
 PFC_choice_pval_s = []
 
+s_stim_accuracies = []
+s_choice_accuracies = []
+
 for animal in ANIMALS:
     if animal in incorrect_format_files:
         continue
 
     animal_dict = ANIMALS[animal]
+
     if animal_dict['include']:
         print(animal)
 
@@ -96,8 +100,8 @@ for animal in ANIMALS:
             name=iset_name, 
             start=all_trial_starts, 
             end=all_nose_pokes, 
-            # start_padding=-0.5,
-            # end_padding=1.5,
+            start_padding=-0.5,
+            # end_padding=0.5,
             fill_end_nans="mean", 
             remove_overlaps="last")
 
@@ -136,7 +140,7 @@ for animal in ANIMALS:
             first_window_log_ISIs = np.array(first_window_log_ISIs)
 
             bw_folds = 10
-            if len(first_window_log_ISIs) < 20:
+            if len(first_window_log_ISIs) < 10:
                 if animal[0] == 'A':
                     AC_stim_accuracies.append(nan)
                     AC_stim_pval_s.append(nan)
@@ -220,9 +224,15 @@ for animal in ANIMALS:
             print("Stimulus model fit for animal %s, neuron %d" %(animal, neuron_num))
             mean_accuracy = np.nanmean(accuracy_per_fold)
             mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
+            mean_s_accuracy = np.nanmean(s_accuracy_per_fold)
             print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
+            print("SYNTHETIC mean accuracy: %f"%mean_s_accuracy)
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
+            print("IS PVAL LESS: ", pval_s < 0.05)
+            print()
+
+            s_stim_accuracies.append(mean_s_accuracy)
 
             if animal[0] == 'A':
                 AC_stim_accuracies.append(mean_accuracy)
@@ -288,9 +298,15 @@ for animal in ANIMALS:
             print("Choice model fit for animal %s, neuron %d" %(animal, neuron_num))
             mean_accuracy = np.nanmean(accuracy_per_fold)
             mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
+            mean_s_accuracy = np.nanmean(s_accuracy_per_fold)
             print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
+            print("SYNTHETIC mean accuracy: %f"%mean_s_accuracy)
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
+            print("IS PVAL LESS: ", pval_s < 0.05)
+            print()
+
+            s_choice_accuracies.append(mean_s_accuracy)
 
             if animal[0] == 'A':
                 AC_choice_accuracies.append(mean_accuracy)
@@ -300,15 +316,23 @@ for animal in ANIMALS:
                 PFC_choice_pval_s.append(pval_s)
 
 np.savez(
-    "window_accuracies_new", 
+    "window_accuracies_with_synthetic", 
     AC_stim_accuracies=AC_stim_accuracies,
     PFC_stim_accuracies=PFC_stim_accuracies,
     AC_choice_accuracies=AC_choice_accuracies,
     PFC_choice_accuracies=PFC_choice_accuracies,
+    s_stim_accuracies=s_stim_accuracies,
+    s_choice_accuracies=s_choice_accuracies,
     AC_stim_pval_s=AC_stim_pval_s,
     PFC_stim_pval_s=PFC_stim_pval_s,
     AC_choice_pval_s=AC_choice_pval_s,
     PFC_choice_pval_s=PFC_choice_pval_s)
+
+plt.scatter(s_stim_accuracies, s_choice_accuracies, 'k')
+plt.xlabel("Stimulus decoding performance")
+plt.ylabel("Choice decoding performance")
+plt.title("Synthetic spike trains")
+plt.show()
 
 is_SS_AC_stim, acc_threshold_AC_stim = NDecoder.get_threshold_mask(AC_stim_accuracies, AC_stim_pval_s)
 is_SS_PFC_stim, acc_threshold_PFC_stim = NDecoder.get_threshold_mask(PFC_stim_accuracies, PFC_stim_pval_s)
