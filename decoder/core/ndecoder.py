@@ -1,5 +1,5 @@
 import random
-from typing import Optional
+from typing import Optional, Union
 import numpy as np 
 import pandas as pd 
 from KDEpy import FFTKDE 
@@ -43,6 +43,8 @@ class NDecoder:
         self.min_ISIs = min_ISIs
         self.conditions = conditions
         self.model = Model(conditions) 
+        
+        self.log_ISI_construction_set = None
     
     def _create_condition_subset_mapping(
         self, 
@@ -90,7 +92,8 @@ class NDecoder:
         log_ISIs_construction_set: ArrayLike, 
         trial_start: float, 
         trial_end: float,
-        lead_time: float = 1000):
+        scaling_factor: Union[int, float] = 1000,
+        return_final_spikes: bool = False):
         """
         Generates synthetic log ISIs for a given trial. Fills the duration from 
         trial_start to trial_end with randomly sampled log ISIs from the log ISI
@@ -101,34 +104,43 @@ class NDecoder:
         log_ISIs_construction_set : array-like, shape (num log ISIs, )
             Real log ISI data. 
         trial_start : float
-            Trial start time for the given trial, in seconds.
+            Trial start time for the given trial.
         trial_end : float
-            Trial end time for the given trial, in seconds.
-        lead_time : float (default = 1000)
-            Lead time in milliseconds. This lead time is added to trial_start 
-            when filling the duration from trial_start to trial_end.
+            Trial end time for the given trial.
+        scaling_factor : int, optional
+            Factor to scale the spike times. Needs to match the scaling factor
+            used in Session.compute_log_ISIs. Defaults to 1000.
+        # TODO: return_final_spikes
 
         Returns
         -------
         synthetic_log_ISIs : array-like, shape (num log ISIs, )
             The synthetic log ISIs based on the given trial data.
         """
-        # Computes trial length in milliseconds. 
-        trial_length = (trial_end - trial_start)*1000
+        # Computes trial length, scaled by scaling factor. 
+        trial_length = (trial_end - trial_start)*scaling_factor
         
         if len(log_ISIs_construction_set) == 0:
+            if return_final_spikes:
+                return np.array([]), np.array([])
             return np.array([])
 
         synthetic_log_ISIs = []
-        ctime = lead_time
+        synthetic_final_spikes = []
+
+        first_log_ISI = random.choice(log_ISIs_construction_set)
+        ctime = 10**first_log_ISI
         while True:
-            synthetic_log_ISI = np.random.choice(log_ISIs_construction_set)
+            synthetic_log_ISI = random.choice(log_ISIs_construction_set)
             ctime += 10**synthetic_log_ISI
             if ctime <= trial_length:
                 synthetic_log_ISIs.append(synthetic_log_ISI)
+                synthetic_final_spikes.append(ctime / scaling_factor)
             else:
                 break
         
+        if return_final_spikes:
+            return np.array(synthetic_log_ISIs), np.array(synthetic_final_spikes)
         return np.array(synthetic_log_ISIs)
 
     @staticmethod
@@ -155,10 +167,6 @@ class NDecoder:
         x = np.linspace(-2, 20, 100)
         
         fftkde = FFTKDE(bw=bw, kernel='gaussian').fit(log_ISIs, weights=None)
-        # min_fftkde_data = np.min(fftkde.data, axis=0)
-        # max_fftkde_data = np.max(fftkde.data, axis=0)
-        
-        # x = np.linspace(int(min_fftkde_data) - 1, int(max_fftkde_data) + 1, 100)
 
         y = fftkde.evaluate(x)
 
@@ -184,21 +192,18 @@ class NDecoder:
 
         Parameters
         ----------
-        X : array-like, shape (num_trials, len_of_isi)
+        X : array-like, shape (num trials, num ISIs per trial)
             Log ISIs for each trial.
-        y : array-like, shape (num_trials,)
+        y : array-like, shape (num trials,)
             Condition for each trial.
         synthetic : bool, default False
             Whether synthetic log ISI data should be constructed and used to
             fit the model.
-        start_end_times : array-like, shape (num_trials, 2), optional
+        start_end_times : array-like, shape (num trials, 2), optional
             The start and end times for each trial, to be used when
             generating synthetic log ISIs. This arg is required if 
             synthetic = True. 
         """ 
-
-        decoding_conditions = self._create_condition_subset_mapping(X, y)
-
         if len(X) < self.min_ISIs:
             print("Insufficient LogISIs data for analysis.")
             return
@@ -232,6 +237,8 @@ class NDecoder:
         # Handle individual conditions
         num_ISIs_per_trial = [len(l) for l in X]
         total_empty_ISI_trials = np.sum(np.equal(num_ISIs_per_trial,0))
+
+        decoding_conditions = self._create_condition_subset_mapping(X, y)
 
         for label in decoding_conditions: 
             prior_0 = 1.0 / len(self.conditions)
@@ -272,20 +279,17 @@ class NDecoder:
 
         Parameters
         ----------
-        X : array-like, shape (num_trials, len_of_isi)
-            Log ISIs for each trial.
-        y : array-like, shape (num_trials,)
+        X : array-like, shape (num trials, num windows per trial, num ISIs per window)
+            Log ISIs for each sliding window in each trial.
+        y : array-like, shape (num trials,)
             Condition for each trial.
-        windows : array-like, shape (num_windows, 2)
+        windows : array-like, shape (num windows, 2)
             The start and end times (time-locked to trial starts) of each
             window to compute PDFs for. 
         synthetic : bool, default False
             Whether synthetic log ISI data should be constructed and used to
             fit the model.
         """ 
-
-        condition_to_X = self._create_condition_subset_mapping(X, y)
-
         log_ISI_construction_set = []
 
         window_pdfs = {}
@@ -308,6 +312,7 @@ class NDecoder:
                 continue
 
             # TODO: add error handling: if KDE throws data out of range error 
+            # f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw['overall'])
             f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw)
 
             window_pdfs[(w_start, w_end)] = f
@@ -318,6 +323,7 @@ class NDecoder:
         # Handle synthetic log ISI generation
         if synthetic:
             log_ISI_construction_set = np.array(log_ISI_construction_set)
+            self.log_ISI_construction_set = log_ISI_construction_set
 
             synthetic_log_ISIs = []
 
@@ -342,6 +348,8 @@ class NDecoder:
             if np.all([len(window) == 0 for window in trial]):
                 total_empty_ISI_trials += 1
 
+        condition_to_X = self._create_condition_subset_mapping(X, y)
+
         # Handle individual conditions
         for label in condition_to_X: 
             X_cond = condition_to_X[label]
@@ -362,7 +370,7 @@ class NDecoder:
                 cond=label, 
                 prior_0=prior_0,
                 prior_empty=prior_empty)
-                
+
             window_pdfs = {}
             window_inv_cdfs = {}
 
@@ -380,11 +388,12 @@ class NDecoder:
                     continue
 
                 # TODO: add error handling: if KDE throws data out of range error 
+                # f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw[label])
                 f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw)
 
                 window_pdfs[(w_start, w_end)] = f
                 window_inv_cdfs[(w_start, w_end)] = inv_f 
-            
+
             self.model.set_cond(
                 cond=label, 
                 pdf=window_pdfs, 
@@ -443,16 +452,16 @@ class NDecoder:
             for start, end in windows:
                 if spike >= start and spike <= end:
                     curr_dist = end - spike
-                    if min_dist == None or curr_dist < min_dist:
-                        min_dist = curr_dist
-                        best_window = (start, end)
+            if min_dist == None or curr_dist < min_dist:
+                min_dist = curr_dist
+                best_window = (start, end)
 
         return best_window
 
-    def _predict_window_single_trial(
+    def predict_window_single_trial(
         self, 
         trial_log_ISIs: ArrayLike, 
-        trial_final_spike: float,
+        trial_final_spikes: ArrayLike,
         synthetic : bool = False,
         display_trial: bool = False,
         best_window_metric: str = 'center',
@@ -468,9 +477,9 @@ class NDecoder:
         ----------
         trial_logISIs : array-like 
             All log ISIs for the trial.
-        trial_final_spike : float
-            The final spike in the trial. Used to select which sliding window's
-            PDF should be used in predictions.
+        trial_final_spikes : float
+            The final spike for the log ISIs in each trial. Used to select which 
+            sliding window's PDF should be used in predictions.
         synthetic : bool, default False
             Whether synthetic spike train data should be constructed and used in
             model prediction.
@@ -508,13 +517,15 @@ class NDecoder:
             raise ValueError("Invalid window metric. The only valid metrics are 'center', 'start', and 'end'.")
 
         trial_log_ISIs = np.asarray(trial_log_ISIs)
+        trial_final_spikes = np.asarray(trial_final_spikes)
 
-        # Handle synthetic log ISI generation
+        # Handle synthetic trial generation
         if synthetic:
-            trial_log_ISIs = self.generate_synthetic_ISIs(
+            trial_log_ISIs, trial_final_spikes = self.generate_synthetic_ISIs(
                 log_ISIs_construction_set, 
                 trial_start, 
-                trial_end)
+                trial_end, 
+                return_final_spikes=True)
 
         # No ISIs in trial, make a guess based on priors
         if len(trial_log_ISIs) < 1:
@@ -531,10 +542,7 @@ class NDecoder:
         
         # ISIs were present in the trial, predict based on normalized probabilities
         else:
-            # Set up probabilities with initial values equal to priors
-            probabilities = {cond: np.full(len(trial_log_ISIs) + 1, np.nan)
-                            for cond in self.conditions}
-        
+            # Error handling for model priors and PDFs
             for cond in self.conditions:
                 if self.model.conds[cond].prior_0 is None:
                     raise ValueError("Model's prior_0 uninitialized for %s condition." %cond)
@@ -542,26 +550,45 @@ class NDecoder:
                 if self.model.conds[cond].pdf is None:
                     raise ValueError("Model's pdf uninitialized for %s condition." %cond)
 
-                windows = np.sort(list(self.model.conds[cond].pdf.keys()))
-                best_window = self._spike_to_window(trial_final_spike, windows, best_window_metric)
-                best_pdf = None
-                if best_window == (None, None):
-                    # print("Spike out of bounds, making 0 PDF")
-                    best_pdf = lambda x : [0 for i in range(len(x))]
-                else: 
-                    best_pdf = self.model.conds[cond].pdf[best_window]
+            # Map each condition to all the windows with computed PDFs
+            windows = {cond: np.sort(list(self.model.conds[cond].pdf.keys())) 
+                        for cond in self.conditions}
 
-                # Calculate cumulative log-likelihood ratio (LLR) after each LogISI
+            # Set up probabilities with initial values equal to priors
+            probabilities = {cond: np.full(len(trial_log_ISIs) + 1, np.nan)
+                            for cond in self.conditions}
+            for cond in self.conditions:
+                probabilities[cond][0] = self.model.conds[cond].prior_0
+
+            # Update probabilities for conditions with each log ISI
+            for idx, final_spike in enumerate(trial_final_spikes):
+                spike_out_of_bounds = False
+
+                for cond in self.conditions:
+                    best_window = self._spike_to_window(final_spike, windows[cond], best_window_metric)
+                    if best_window == (None, None):
+                        # If final spike is out of bounds, ignore it for all conds
+                        # print("idx ", idx, " has spike out of bounds for cond ", cond)
+                        spike_out_of_bounds = True
+                        break
+
+                    best_pdf = self.model.conds[cond].pdf[best_window]
+                    probabilities[cond][idx + 1] = best_pdf([trial_log_ISIs[idx]])
+
+                if spike_out_of_bounds:
+                    for cond in self.conditions:
+                        probabilities[cond][idx + 1] = probabilities[cond][idx]
+            
+            sum_of_probs = np.zeros(len(trial_log_ISIs) + 1)
+            for cond in self.conditions:
+                # Calculate cumulative log-likelihood ratio (LLR) after each log ISI
                 probabilities[cond] = np.cumsum(
-                    np.log10(np.concatenate(([self.model.conds[cond].prior_0],
-                                            best_pdf(trial_log_ISIs)))))
+                    np.log10(probabilities[cond]))
 
                 # Exponentiate back from log to enable normalization
                 probabilities[cond] = np.power(10, probabilities[cond])
-        
-            # Calculate total probability sum to normalize
-            sum_of_probs = np.zeros(len(trial_log_ISIs) + 1)
-            for cond in self.conditions:
+
+                # Calculate total probability sum to normalize
                 sum_of_probs += probabilities[cond]
 
             # Normalize all probabilities
@@ -590,7 +617,7 @@ class NDecoder:
             all_probs = {cond : probabilities[cond][-1] for cond in probabilities}
             return max_cond, probabilities[max_cond][-1], all_probs, False
 
-    def _predict_single_trial(
+    def predict_single_trial(
         self, 
         trial_log_ISIs: ArrayLike, 
         synthetic : bool = False,
@@ -648,10 +675,10 @@ class NDecoder:
         # No ISIs in trial, make a guess based on priors
         if len(trial_log_ISIs) < 1:
             sum_of_probs = 0
+            
             for cond in self.conditions:
                 if self.model.conds[cond].prior_empty is None:
                     raise ValueError("Model's prior_empty uninitialized for %s condition." %cond)
-
                 sum_of_probs += self.model.conds[cond].prior_empty
 
             all_priors = {cond: self.model.conds[cond].prior_empty / sum_of_probs for cond in self.conditions}   
@@ -713,26 +740,6 @@ class NDecoder:
             max_cond = max(self.conditions, key=lambda cond: probabilities[cond][-1])
             all_probs = {cond : probabilities[cond][-1] for cond in probabilities}
             return max_cond, probabilities[max_cond][-1], all_probs, False
-    
-    def display_single_trial(
-        self, 
-        trial_log_ISIs: ArrayLike, 
-        file_path: Optional[str] = None):
-        """
-        Displays and (optionally) saves a figure showing the prediction of the 
-        model on a single trial. 
-
-        Parameters
-        ----------
-        trial_log_ISIs : array-like, shape (num ISIs, )
-            The log ISIs for a single trial. 
-        file_path : str
-            Path to store generated figure at.
-        """
-        self._predict_single_trial(
-            trial_log_ISIs, 
-            display_trial=True,
-            file_path=file_path)
 
     @staticmethod
     def generate_stratified_K_folds(
@@ -824,9 +831,11 @@ class NDecoder:
             Number of predictions made for trials with no ISIs divided by the 
             total number of predictions made.
         """
-        prob_correct = 0
+        cond_prob_correct = {}
+        cond_num_preds = {}
+
         num_empty_ISIs = 0
-        num_preds = 0
+        total_num_preds = 0
 
         if synthetic and start_end_times is None:
             raise ValueError("Trial start and end times must be passed in to generate synthetic log ISI data")
@@ -840,85 +849,36 @@ class NDecoder:
                 trial_start, trial_end = start_end_times[idx]
                 log_ISI_construction_set = test_X_concat
 
-            cond, _, all_probs, empty_ISIs = self._predict_single_trial(
+            _, _, all_probs, empty_ISIs = self.predict_single_trial(
                 trial, 
                 synthetic=synthetic,
                 log_ISIs_construction_set=log_ISI_construction_set,
                 trial_start=trial_start, 
                 trial_end=trial_end)
             
-            if cond is None:
-                continue
+            if test_y[idx] not in cond_prob_correct:
+                cond_prob_correct[test_y[idx]] = 0
             
-            prob_correct += all_probs[test_y[idx]]
+            if test_y[idx] not in cond_num_preds:
+                cond_num_preds[test_y[idx]] = 0
+
+            cond_prob_correct[test_y[idx]] = cond_prob_correct[test_y[idx]] + all_probs[test_y[idx]]
+            cond_num_preds[test_y[idx]] = cond_num_preds[test_y[idx]] + 1
             
             if empty_ISIs:
                 num_empty_ISIs += 1
 
-            num_preds += 1
+            total_num_preds += 1
 
-        if num_preds == 0:
+        if total_num_preds == 0:
             return np.nan,np.nan
-        else:
-            return (prob_correct/num_preds), (num_empty_ISIs/num_preds)
 
-    def calculate_circular_MSE(self, 
-        test_X: ArrayLike, 
-        test_y: ArrayLike, 
-        max_cond : float,
-        synthetic: bool = False,
-        start_end_times: Optional[ArrayLike] = None) -> tuple[float, float]:
-
-        num_empty_ISIs = 0
-        num_preds = 0
-        mse = 0
-        rand_mse = 0
-        pred_y = []
-
-        if synthetic and start_end_times is None:
-            raise ValueError("Trial start and end times must be passed in to generate synthetic log ISI data")
-
-        for idx, trial in enumerate(test_X):
-            test_X_concat = np.concatenate(test_X)
-
-            trial_start, trial_end, log_ISI_construction_set = None, None, None
-
-            if synthetic:
-                trial_start, trial_end = start_end_times[idx]
-                log_ISI_construction_set = test_X_concat
-
-            cond, _, _, empty_ISIs = self._predict_single_trial(
-                trial, 
-                synthetic=synthetic, 
-                log_ISIs_construction_set=log_ISI_construction_set,
-                trial_start=trial_start, 
-                trial_end=trial_end)
-            
-            if cond is None:
-                continue
-
-            if empty_ISIs:
-                num_empty_ISIs += 1
-            num_preds += 1
-            pred_y.append(cond)
-        
-            labels = [i for i in range(1, 9)]
-            rand_pred = random.choice(labels)
-            pred = float(cond)
-            actual = float(test_y[idx])
-
-            circ_dist = min(abs(max_cond - pred), abs(0 - pred)) + min(abs(max_cond - actual), abs(0 - actual))
-            rand_circ_dist = min(abs(max_cond - rand_pred), abs(0 - rand_pred)) + min(abs(max_cond - actual), abs(0 - actual))
-            
-            err = min(abs(pred - actual), circ_dist)
-            mse += err 
-            rand_err = min(abs(rand_pred - actual), rand_circ_dist)
-            rand_mse += rand_err
-
-        if num_preds == 0:
-            return np.nan, np.nan, np.nan, np.nan
-        else:
-            return (mse/num_preds), (rand_mse/num_preds), (num_empty_ISIs/num_preds), pred_y
+        balanced_acc = 0
+        num_conds = len(cond_prob_correct.keys())
+        for cond in cond_prob_correct:
+            balanced_acc += (cond_prob_correct[cond] / cond_num_preds[cond])
+        balanced_acc /= num_conds
+        return balanced_acc, (num_empty_ISIs/total_num_preds)
     
     def calculate_window_accuracy(
         self, 
@@ -928,8 +888,8 @@ class NDecoder:
         synthetic: bool = False,
         start_end_times: Optional[ArrayLike] = None) -> tuple[float, float]:
         """
-        Calculates the accuracy of the decoder on unseen test trial data using 
-        sliding windows.
+        Calculates the balanced accuracy of the decoder on unseen test trial 
+        data using sliding windows.
 
         Parameters
         ----------
@@ -938,7 +898,7 @@ class NDecoder:
         test_y : array-like, shape (num trials,)
             Condition of each trial.
         trial_final_spikes : float
-            The final spike in each trial. Used to select which sliding window's
+            The final spike for each log ISI in each trial. Used to select which sliding window's
             PDF should be used in predictions.
         synthetic : bool, default False
             Whether synthetic spike train data should be constructed and used in
@@ -957,105 +917,55 @@ class NDecoder:
             Number of predictions made for trials with no ISIs divided by the 
             total number of predictions made.
         """
+        cond_prob_correct = {}
+        cond_num_preds = {}
 
-        prob_correct = 0
         num_empty_ISIs = 0
-        num_preds = 0
-
+        total_num_preds = 0
+            
         if synthetic and start_end_times is None:
             raise ValueError("Trial start and end times must be passed in to generate synthetic log ISI data")
-        
-        for idx, trial in enumerate(test_X):
-            test_X_concat = np.concatenate(test_X)
 
+        test_X_concat = np.concatenate(test_X)
+
+        for idx, trial in enumerate(test_X):
             trial_start, trial_end, log_ISI_construction_set = None, None, None
 
             if synthetic:
                 trial_start, trial_end = start_end_times[idx]
                 log_ISI_construction_set = test_X_concat
 
-            cond, _, all_probs, empty_ISIs = self._predict_window_single_trial(
-                trial, 
+            _, _, all_probs, empty_ISIs = self.predict_window_single_trial(
+                trial,
                 test_final_spikes[idx],
                 synthetic=synthetic, 
                 log_ISIs_construction_set=log_ISI_construction_set,
                 trial_start=trial_start, 
                 trial_end=trial_end)
 
-            if cond is None:
-                continue
+            if test_y[idx] not in cond_prob_correct:
+                cond_prob_correct[test_y[idx]] = 0
+            
+            if test_y[idx] not in cond_num_preds:
+                cond_num_preds[test_y[idx]] = 0
 
-            prob_correct += all_probs[test_y[idx]]
+            cond_prob_correct[test_y[idx]] = cond_prob_correct[test_y[idx]] + all_probs[test_y[idx]]
+            cond_num_preds[test_y[idx]] = cond_num_preds[test_y[idx]] + 1
             
             if empty_ISIs:
                 num_empty_ISIs += 1
 
-            num_preds += 1
-            
-        if num_preds == 0:
+            total_num_preds += 1
+
+        if total_num_preds == 0:
             return np.nan,np.nan
-        else:
-            return (prob_correct/num_preds), (num_empty_ISIs/num_preds)
-    
-    def calculate_window_circular_MSE(self, 
-        test_X: ArrayLike, 
-        test_y: ArrayLike, 
-        test_final_spikes: ArrayLike,
-        max_cond : float,
-        synthetic: bool = False,
-        start_end_times: Optional[ArrayLike] = None) -> tuple[float, float]:
 
-        num_empty_ISIs = 0
-        num_preds = 0
-        mse = 0
-        rand_mse = 0
-        pred_y = []
-
-        if synthetic and start_end_times is None:
-            raise ValueError("Trial start and end times must be passed in to generate synthetic log ISI data")
-
-        for idx, trial in enumerate(test_X):
-            test_X_concat = np.concatenate(test_X)
-
-            trial_start, trial_end, log_ISI_construction_set = None, None, None
-
-            if synthetic:
-                trial_start, trial_end = start_end_times[idx]
-                log_ISI_construction_set = test_X_concat
-
-            cond, _, _, empty_ISIs = self._predict_window_single_trial(
-                trial, 
-                test_final_spikes[idx],
-                synthetic=synthetic, 
-                log_ISIs_construction_set=log_ISI_construction_set,
-                trial_start=trial_start, 
-                trial_end=trial_end)
-            
-            if cond is None:
-                continue
-
-            if empty_ISIs:
-                num_empty_ISIs += 1
-            num_preds += 1
-            pred_y.append(cond)
-        
-            labels = [i for i in range(1, 9)]
-            rand_pred = random.choice(labels)
-            pred = float(cond)
-            actual = float(test_y[idx])
-
-            circ_dist = min(abs(max_cond - pred), abs(0 - pred)) + min(abs(max_cond - actual), abs(0 - actual))
-            rand_circ_dist = min(abs(max_cond - rand_pred), abs(0 - rand_pred)) + min(abs(max_cond - actual), abs(0 - actual))
-            
-            err = min(abs(pred - actual), circ_dist)
-            mse += err 
-            rand_err = min(abs(rand_pred - actual), rand_circ_dist)
-            rand_mse += rand_err
-
-        if num_preds == 0:
-            return np.nan, np.nan, np.nan, np.nan
-        else:
-            return (mse/num_preds), (rand_mse/num_preds), (num_empty_ISIs/num_preds), pred_y
+        balanced_acc = 0
+        num_conds = len(cond_prob_correct.keys())
+        for cond in cond_prob_correct:
+            balanced_acc += (cond_prob_correct[cond] / cond_num_preds[cond])
+        balanced_acc /= num_conds
+        return balanced_acc, (num_empty_ISIs/total_num_preds)
     
     @staticmethod
     def get_threshold_mask(acc, pval_s):
@@ -1094,6 +1004,7 @@ class NDecoder:
 
         is_finite = np.isfinite(acc)
         is_valid_pval = np.less(pval_s,0.05)
+        # is_above_acc = np.greater_equal(acc, acc_threshold)
         is_above_acc = np.greater_equal(acc,0.5)
         is_SS = np.logical_and(is_valid_pval, is_finite)
         is_SS = np.logical_and(is_SS, is_above_acc)
@@ -1185,3 +1096,118 @@ class NDecoder:
         if file_path is not None:
             plt.savefig(file_path)
         plt.show()
+
+
+
+
+# def calculate_circular_MSE(self, 
+    #     test_X: ArrayLike, 
+    #     test_y: ArrayLike, 
+    #     max_cond : float,
+    #     synthetic: bool = False,
+    #     start_end_times: Optional[ArrayLike] = None) -> tuple[float, float]:
+
+    #     num_empty_ISIs = 0
+    #     num_preds = 0
+    #     mse = 0
+    #     rand_mse = 0
+    #     pred_y = []
+
+    #     if synthetic and start_end_times is None:
+    #         raise ValueError("Trial start and end times must be passed in to generate synthetic log ISI data")
+
+    #     for idx, trial in enumerate(test_X):
+    #         test_X_concat = np.concatenate(test_X)
+
+    #         trial_start, trial_end, log_ISI_construction_set = None, None, None
+
+    #         if synthetic:
+    #             trial_start, trial_end = start_end_times[idx]
+    #             log_ISI_construction_set = test_X_concat
+
+    #         cond, _, _, empty_ISIs = self.predict_single_trial(
+    #             trial, 
+    #             synthetic=synthetic, 
+    #             log_ISIs_construction_set=log_ISI_construction_set,
+    #             trial_start=trial_start, 
+    #             trial_end=trial_end)
+
+    #         if empty_ISIs:
+    #             num_empty_ISIs += 1
+    #         num_preds += 1
+    #         pred_y.append(cond)
+        
+    #         labels = [i for i in range(1, 9)]
+    #         rand_pred = random.choice(labels)
+    #         pred = float(cond)
+    #         actual = float(test_y[idx])
+
+    #         circ_dist = min(abs(max_cond - pred), abs(0 - pred)) + min(abs(max_cond - actual), abs(0 - actual))
+    #         rand_circ_dist = min(abs(max_cond - rand_pred), abs(0 - rand_pred)) + min(abs(max_cond - actual), abs(0 - actual))
+            
+    #         err = min(abs(pred - actual), circ_dist)
+    #         mse += err 
+    #         rand_err = min(abs(rand_pred - actual), rand_circ_dist)
+    #         rand_mse += rand_err
+
+    #     if num_preds == 0:
+    #         return np.nan, np.nan, np.nan, np.nan
+    #     else:
+    #         return (mse/num_preds), (rand_mse/num_preds), (num_empty_ISIs/num_preds), pred_y
+
+# def calculate_window_circular_MSE(self, 
+    #     test_X: ArrayLike, 
+    #     test_y: ArrayLike, 
+    #     test_final_spikes: ArrayLike,
+    #     max_cond : float,
+    #     synthetic: bool = False,
+    #     start_end_times: Optional[ArrayLike] = None) -> tuple[float, float]:
+
+    #     num_empty_ISIs = 0
+    #     num_preds = 0
+    #     mse = 0
+    #     rand_mse = 0
+    #     pred_y = []
+
+    #     if synthetic and start_end_times is None:
+    #         raise ValueError("Trial start and end times must be passed in to generate synthetic log ISI data")
+
+    #     for idx, trial in enumerate(test_X):
+    #         test_X_concat = np.concatenate(test_X)
+
+    #         trial_start, trial_end, log_ISI_construction_set = None, None, None
+
+    #         if synthetic:
+    #             trial_start, trial_end = start_end_times[idx]
+    #             log_ISI_construction_set = test_X_concat
+
+    #         cond, _, _, empty_ISIs = self.predict_window_single_trial(
+    #             trial, 
+    #             test_final_spikes[idx],
+    #             synthetic=synthetic, 
+    #             log_ISIs_construction_set=log_ISI_construction_set,
+    #             trial_start=trial_start, 
+    #             trial_end=trial_end)
+
+    #         if empty_ISIs:
+    #             num_empty_ISIs += 1
+    #         num_preds += 1
+    #         pred_y.append(cond)
+        
+    #         labels = [i for i in range(1, 9)]
+    #         rand_pred = random.choice(labels)
+    #         pred = float(cond)
+    #         actual = float(test_y[idx])
+
+    #         circ_dist = min(abs(max_cond - pred), abs(0 - pred)) + min(abs(max_cond - actual), abs(0 - actual))
+    #         rand_circ_dist = min(abs(max_cond - rand_pred), abs(0 - rand_pred)) + min(abs(max_cond - actual), abs(0 - actual))
+            
+    #         err = min(abs(pred - actual), circ_dist)
+    #         mse += err 
+    #         rand_err = min(abs(rand_pred - actual), rand_circ_dist)
+    #         rand_mse += rand_err
+
+    #     if num_preds == 0:
+    #         return np.nan, np.nan, np.nan, np.nan
+    #     else:
+    #         return (mse/num_preds), (rand_mse/num_preds), (num_empty_ISIs/num_preds), pred_y

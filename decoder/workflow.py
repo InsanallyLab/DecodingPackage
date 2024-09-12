@@ -1,7 +1,7 @@
 from core.ndecoder import NDecoder
 from core.bandwidth import Bandwidth
 import numpy as np
-from tests.io.test_io import test_saving_loading_ndecoder, test_saving_loading_log_ISIs, test_saving_loading_spikes, test_pickle_to_pynapple
+from tests.io.test_io import test_saving_loading_ndecoder, test_saving_loading_log_ISIs, test_pickle_to_pynapple
     
 def run_workflow():
     '''
@@ -26,13 +26,6 @@ def run_workflow():
 
     log_ISIs_train = train_session.compute_log_ISIs(iset_name="train trials", lock_point="start")
     print("Done computing train log_ISIs")
-
-    print("IO test: saving and loading spike train from npz file")
-    test_saving_loading_spikes(
-        session=train_session,
-        iset_name="train trials",
-        file_path="spike_train.npz",
-        lock_point="start")
 
     print("IO test: saving and loading log ISIs from npz file")
     test_saving_loading_log_ISIs(

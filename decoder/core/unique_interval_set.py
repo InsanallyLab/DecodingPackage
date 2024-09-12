@@ -83,6 +83,7 @@ class UniqueIntervalSet(nap.IntervalSet):
         
         self.idx_removed = None
         idx_to_remove = []
+        
         for i in range(1, len(start)):
             if start[i] < end[i - 1]:
                 if remove_overlaps is None:

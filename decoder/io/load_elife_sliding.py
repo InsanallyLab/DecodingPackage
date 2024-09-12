@@ -76,12 +76,18 @@ for animal in ANIMALS:
                             index = (nose_poke_times > trial_start)
                         else:
                             index = (nose_poke_times > trial_start)*(nose_poke_times < trial_starts[i+1])
+
                         if sum(index) == 0:
                             nose_poke_time = np.nan
                             choice_conditions.append('no-go')
                         else:
                             nose_poke_time = nose_poke_times[index][0]
-                            choice_conditions.append('go')
+
+                            if nose_poke_time > trial_start + 2.5:
+                                nose_poke_time = np.nan
+                                choice_conditions.append('no-go')
+                            else: 
+                                choice_conditions.append('go')
                         all_nose_pokes.append(nose_poke_time)
         
         all_nose_pokes = np.array(all_nose_pokes)
@@ -101,7 +107,7 @@ for animal in ANIMALS:
             start=all_trial_starts, 
             end=all_nose_pokes, 
             start_padding=-0.5,
-            # end_padding=0.5,
+            end_padding=0.5,
             fill_end_nans="mean", 
             remove_overlaps="last")
 
@@ -132,28 +138,59 @@ for animal in ANIMALS:
             start_end_times = list(zip(trial_iset.start, trial_iset.end))
             start_end_times = np.array(start_end_times, dtype='object')
 
+            # Code for calculating bandwidth for each condition
+            # target_log_ISIs = []
+            # non_target_log_ISIs = []
+            # go_log_ISIs = []
+            # no_go_log_ISIs = []
+
             first_window_log_ISIs = []
-            for window_log_ISIs in windowed_log_ISIs:
+
+            for idx, window_log_ISIs in enumerate(windowed_log_ISIs):
                 if len(window_log_ISIs) > 0:
                     first_window_log_ISIs.extend(window_log_ISIs[0])
 
+                    # if stimulus_tsd.values[idx] == 'target':
+                    #     target_log_ISIs.extend(window_log_ISIs[0])
+                    # if stimulus_tsd.values[idx] == 'non-target':
+                    #     non_target_log_ISIs.extend(window_log_ISIs[0])
+                    # if choice_tsd.values[idx] == 'go':
+                    #     go_log_ISIs.extend(window_log_ISIs[0])
+                    # if choice_tsd.values[idx] == 'no-go':
+                    #     no_go_log_ISIs.extend(window_log_ISIs[0])
+
             first_window_log_ISIs = np.array(first_window_log_ISIs)
 
+            # target_log_ISIs = np.array(target_log_ISIs)
+            # non_target_log_ISIs = np.array(non_target_log_ISIs)
+            # go_log_ISIs = np.array(go_log_ISIs)
+            # no_go_log_ISIs = np.array(no_go_log_ISIs)
+
             bw_folds = 10
-            if len(first_window_log_ISIs) < 10:
-                if animal[0] == 'A':
-                    AC_stim_accuracies.append(nan)
-                    AC_stim_pval_s.append(nan)
-                    AC_choice_accuracies.append(nan)
-                    AC_choice_pval_s.append(nan)
-                else: 
-                    PFC_stim_accuracies.append(nan)
-                    PFC_stim_pval_s.append(nan)
-                    PFC_choice_accuracies.append(nan)
-                    PFC_choice_pval_s.append(nan)
+            if len(first_window_log_ISIs) < 1:
                 continue
             kde_bw = Bandwidth.sklearn_grid_search_bw(first_window_log_ISIs, bw_folds)
             print("KDE bandwidth: ", kde_bw)
+            
+            # if len(target_log_ISIs) < 1:
+            #     continue
+            # target_bw = Bandwidth.sklearn_grid_search_bw(target_log_ISIs, bw_folds)
+            # print("target bandwidth: ", target_bw)
+
+            # if len(non_target_log_ISIs) < 1:
+            #     continue
+            # non_target_bw = Bandwidth.sklearn_grid_search_bw(non_target_log_ISIs, bw_folds)
+            # print("non target bandwidth: ", non_target_bw)
+
+            # if len(go_log_ISIs) < 1:
+            #     continue
+            # go_bw = Bandwidth.sklearn_grid_search_bw(go_log_ISIs, bw_folds)
+            # print("go bandwidth: ", go_bw)
+
+            # if len(no_go_log_ISIs) < 1:
+            #     continue
+            # no_go_bw = Bandwidth.sklearn_grid_search_bw(no_go_log_ISIs, bw_folds)
+            # print("no go bandwidth: ", no_go_bw)
 
             # Make stimulus decoder. 
             min_ISIs = 1
@@ -161,11 +198,19 @@ for animal in ANIMALS:
             stimulus_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             s_stimulus_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
 
+            # stimulus_bw = {'overall': kde_bw, 'target': target_bw, 'non-target': non_target_bw}
+            # stimulus_decoder = NDecoder(bw=stimulus_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
+            # s_stimulus_decoder = NDecoder(bw=stimulus_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
+
             # Make choice decoder. 
             min_ISIs = 1
             possible_conditions = ["go", "no-go"]
             choice_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             s_choice_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
+
+            # choice_bw = {'overall': kde_bw, 'go': go_bw, 'no-go': no_go_bw}
+            # choice_decoder = NDecoder(bw=choice_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
+            # s_choice_decoder = NDecoder(bw=choice_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
 
             ''' 
             STIMULUS DECODER TRAINING
@@ -203,7 +248,7 @@ for animal in ANIMALS:
 
                     accuracy, frac_empty = stimulus_decoder.calculate_window_accuracy(
                         validate_X, 
-                        validate_y, 
+                        validate_y,
                         validate_final_spikes)
                     accuracy_per_fold.append(accuracy)
                     frac_empty_ISIs_per_fold.append(frac_empty)
@@ -213,7 +258,7 @@ for animal in ANIMALS:
                     
                     s_accuracy, s_frac_empty = s_stimulus_decoder.calculate_window_accuracy(
                         validate_X, 
-                        validate_y, 
+                        validate_y,
                         validate_final_spikes,
                         synthetic=True, 
                         start_end_times=validate_start_end_times)
@@ -229,8 +274,6 @@ for animal in ANIMALS:
             print("SYNTHETIC mean accuracy: %f"%mean_s_accuracy)
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
-            print("IS PVAL LESS: ", pval_s < 0.05)
-            print()
 
             s_stim_accuracies.append(mean_s_accuracy)
 
@@ -303,8 +346,6 @@ for animal in ANIMALS:
             print("SYNTHETIC mean accuracy: %f"%mean_s_accuracy)
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
-            print("IS PVAL LESS: ", pval_s < 0.05)
-            print()
 
             s_choice_accuracies.append(mean_s_accuracy)
 
@@ -316,7 +357,7 @@ for animal in ANIMALS:
                 PFC_choice_pval_s.append(pval_s)
 
 np.savez(
-    "window_accuracies_with_synthetic", 
+    "cap_end_time", 
     AC_stim_accuracies=AC_stim_accuracies,
     PFC_stim_accuracies=PFC_stim_accuracies,
     AC_choice_accuracies=AC_choice_accuracies,
@@ -328,7 +369,7 @@ np.savez(
     AC_choice_pval_s=AC_choice_pval_s,
     PFC_choice_pval_s=PFC_choice_pval_s)
 
-plt.scatter(s_stim_accuracies, s_choice_accuracies, 'k')
+plt.scatter(x=s_stim_accuracies, y=s_choice_accuracies, color='k')
 plt.xlabel("Stimulus decoding performance")
 plt.ylabel("Choice decoding performance")
 plt.title("Synthetic spike trains")

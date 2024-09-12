@@ -1,4 +1,3 @@
-from cmath import nan
 import os
 import numpy as np
 import pynapple as nap
@@ -166,12 +165,12 @@ class Session:
         self.iset_to_log_ISIs[iset_name] = np.array(log_ISIs_agg, dtype='object')
         return self.iset_to_log_ISIs[iset_name]
 
-    def _final_spike_in_trials(
+    def _final_spikes_in_trials(
         self,
         iset_name: str, 
         lock_point: str):
         """
-        Returns the (time-locked) final spike contained in each interval in 
+        Returns the (time-locked) "final" spike for each log ISI in each interval in 
         the interval set.
 
         Parameters
@@ -184,17 +183,17 @@ class Session:
         Returns
         -------
         final_spikes_agg : ndarray, shape (num trials, )
-            Array containing the final spike in each trial.
+            Array containing the time-locked final spikes for each log ISI in each trial.
         """
         final_spikes_agg = []
+        interval_set = self.interval_sets[iset_name]
 
-        for _, spikes in self.locked_interval_to_spikes[(lock_point, iset_name)].items():
+        for start, end in zip(interval_set.start, interval_set.end):
+            spikes = self.locked_interval_to_spikes[(lock_point, iset_name)][(start, end)]
             spikes = spikes.t
-            if len(spikes) == 0:
-                final_spikes_agg.append(nan)
-            else:
-                final_spikes_agg.append(spikes[-1])
-        return np.array(final_spikes_agg)
+            final_spikes = spikes[1:]
+            final_spikes_agg.append(final_spikes)
+        return np.array(final_spikes_agg, dtype='object')
 
     def compute_windowed_log_ISIs(
         self, 
@@ -228,7 +227,7 @@ class Session:
             Note that each interval may not use all of the sliding windows in 
             this array, depending on its duration.
         final_spikes : ndarray, shape (num trials, )
-            The final (time-locked) spike in each trial.
+            The final (time-locked) spikes for each log ISI in each trial.
         """
         interval_set = self.interval_sets[iset_name]
         lock_point = 'start'
@@ -237,7 +236,7 @@ class Session:
 
         self.time_lock_to_interval(iset_name=iset_name, lock_point=lock_point)
 
-        final_spikes = self._final_spike_in_trials(iset_name=iset_name, lock_point=lock_point)
+        final_spikes = self._final_spikes_in_trials(iset_name=iset_name, lock_point=lock_point)
         
         windows_agg = []
         max_num_windows = 0
@@ -266,11 +265,21 @@ class Session:
                     max_num_windows = len(windows)
                     windows_agg = windows
 
+                all_interval_spikes = spikes.t
                 trial_windowed_log_ISIs = []
 
                 for w_start, w_end in windows:
                     window_spikes = spikes.get(w_start, w_end)
                     window_spikes = window_spikes.t
+
+                    # Add spike right before window to include ISI that ends in window
+                    if len(window_spikes) > 0:
+                        first_spike = window_spikes[0]
+                        first_spike_idx = np.where(all_interval_spikes == first_spike)[0][0]
+
+                        if first_spike_idx > 0:
+                            prev_spike = all_interval_spikes[first_spike_idx - 1]
+                            window_spikes = np.insert(window_spikes, 0, prev_spike)
 
                     scaled_spikes = window_spikes * scaling_factor
 
@@ -285,7 +294,9 @@ class Session:
                 windowed_log_ISIs_agg.append(trial_windowed_log_ISIs)
         else:
             # Interval set is not padded. Compute sliding windows that are contained entirely within interval.
-            for (start, end), spikes in self.locked_interval_to_spikes[(lock_point, iset_name)].items():
+            for start, end in zip(interval_set.start, interval_set.end):
+                spikes = self.locked_interval_to_spikes[(lock_point, iset_name)][(start, end)]
+
                 first_window_center = window_len / 2. # - start since spikes are time-locked to start
                 last_window_center = end - start - (window_len / 2.) # - start since spikes are time-locked to start
                 windows = [(i - window_len / 2., i + window_len / 2.) for i in np.arange(first_window_center, last_window_center + step, step)]
@@ -294,11 +305,21 @@ class Session:
                     max_num_windows = len(windows)
                     windows_agg = windows
 
+                all_interval_spikes = spikes.t
                 trial_windowed_log_ISIs = []
 
                 for w_start, w_end in windows:
                     window_spikes = spikes.get(w_start, w_end)
                     window_spikes = window_spikes.t
+
+                    # Add spike right before window to include ISI that ends in window
+                    if len(window_spikes) > 0:
+                        first_spike = window_spikes[0]
+                        first_spike_idx = np.where(all_interval_spikes == first_spike)[0][0]
+
+                        if first_spike_idx > 0:
+                            prev_spike = all_interval_spikes[first_spike_idx - 1]
+                            window_spikes = np.insert(window_spikes, 0, prev_spike)
 
                     scaled_spikes = window_spikes * scaling_factor
 
