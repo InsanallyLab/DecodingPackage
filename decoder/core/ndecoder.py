@@ -110,12 +110,17 @@ class NDecoder:
         scaling_factor : int, optional
             Factor to scale the spike times. Needs to match the scaling factor
             used in Session.compute_log_ISIs. Defaults to 1000.
-        # TODO: return_final_spikes
+        return_final_spikes : bool, optional
+            If true, an array of the final (later of the two) spikes 
+            corresponding to each synthetic log ISI is also returned.
 
         Returns
         -------
         synthetic_log_ISIs : array-like, shape (num log ISIs, )
             The synthetic log ISIs based on the given trial data.
+        return_final_spikes : array-like, shape (num log ISIs, )
+            Only returned if return_final_spikes parameter is True. The second
+            of the two spikes that correspond with each synthetic log ISI.
         """
         # Computes trial length, scaled by scaling factor. 
         trial_length = (trial_end - trial_start)*scaling_factor
@@ -164,7 +169,7 @@ class NDecoder:
             Represents the estimated inverse Cumulative Distribution Function 
             (CDF) for sampling.
         """
-        x = np.linspace(-2, 20, 100)
+        x = np.linspace(-2, 18, 100)
         
         fftkde = FFTKDE(bw=bw, kernel='gaussian').fit(log_ISIs, weights=None)
 
@@ -214,7 +219,6 @@ class NDecoder:
             print("Insufficient LogISIs data after flattening for analysis.")
             return 
 
-        # TODO: add error handling: if KDE throws data out of range error 
         f,inv_f = self.estimate_ISI_distribution(log_ISIs_concat, self.bw)
         self.model.set_all(pdf=f, inv_cdf=inv_f) 
 
@@ -311,7 +315,6 @@ class NDecoder:
                 # print("Insufficient LogISIs data for analysis.")
                 continue
 
-            # TODO: add error handling: if KDE throws data out of range error 
             # f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw['overall'])
             f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw)
 
@@ -387,7 +390,6 @@ class NDecoder:
                     # print(f"Skipping fold. Not enough ISIs for the {label} condition")
                     continue
 
-                # TODO: add error handling: if KDE throws data out of range error 
                 # f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw[label])
                 f,inv_f = self.estimate_ISI_distribution(window_ISIs_concat, self.bw)
 
@@ -567,8 +569,6 @@ class NDecoder:
                 for cond in self.conditions:
                     best_window = self._spike_to_window(final_spike, windows[cond], best_window_metric)
                     if best_window == (None, None):
-                        # If final spike is out of bounds, ignore it for all conds
-                        # print("idx ", idx, " has spike out of bounds for cond ", cond)
                         spike_out_of_bounds = True
                         break
 

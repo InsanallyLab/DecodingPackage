@@ -1,4 +1,3 @@
-from cmath import nan
 from decoder.data.animal_info import ANIMALS
 from decoder.data.elife_io import load_events_spikes_script
 import numpy as np
@@ -39,6 +38,7 @@ for animal in ANIMALS:
         spike_files = animal_dict['spike_files']
         event_files = animal_dict['event_files']
         neurons = animal_dict['choice_neurons']
+        trial_duration = animal_dict['trial_duration']
     
         (event_set, spike_set) = load_events_spikes_script(neuron_num=neurons, spike_files=spike_files, event_files=event_files)
         
@@ -83,7 +83,7 @@ for animal in ANIMALS:
                         else:
                             nose_poke_time = nose_poke_times[index][0]
 
-                            if nose_poke_time > trial_start + 2.5:
+                            if nose_poke_time > trial_start + trial_duration:
                                 nose_poke_time = np.nan
                                 choice_conditions.append('no-go')
                             else: 
@@ -106,8 +106,8 @@ for animal in ANIMALS:
             name=iset_name, 
             start=all_trial_starts, 
             end=all_nose_pokes, 
-            start_padding=-0.5,
-            end_padding=0.5,
+            start_padding=-0.5, # so that first window is centered at trial start time
+            end_padding=0.5, # so that last window is centered at trial end time
             fill_end_nans="mean", 
             remove_overlaps="last")
 
@@ -135,8 +135,36 @@ for animal in ANIMALS:
 
             log_ISIs = session.compute_log_ISIs(iset_name=iset_name)
 
-            start_end_times = list(zip(trial_iset.start, trial_iset.end))
+            starts = np.array(trial_iset.start)
+            ends = np.array(trial_iset.end)
+
+            # Filter out trials with less than 3 spikes
+            to_remove = []
+            for i in range(len(log_ISIs)):
+                if len(log_ISIs[i]) < 3:
+                    to_remove.append(i)
+
+            log_ISIs = np.delete(log_ISIs, to_remove)
+            windowed_log_ISIs = np.delete(windowed_log_ISIs, to_remove)
+            final_spikes = np.delete(final_spikes, to_remove)
+
+            new_stim_conds = np.delete(stimulus_conditions, to_remove)
+            new_choice_conds = np.delete(choice_conditions, to_remove)
+
+            stimulus_t = [i for i in range(len(new_stim_conds))]
+            stimulus_tsd = nap.Tsd(t=stimulus_t, d=new_stim_conds)
+
+            choice_t = [i for i in range(len(new_choice_conds))]
+            choice_tsd = nap.Tsd(t=choice_t, d=new_choice_conds)
+
+            starts = np.delete(starts, to_remove)
+            ends = np.delete(ends, to_remove)
+
+            start_end_times = list(zip(starts, ends))
             start_end_times = np.array(start_end_times, dtype='object')
+
+            if len(log_ISIs) < 20: # K * num possible conditions
+                continue
 
             # Code for calculating bandwidth for each condition
             # target_log_ISIs = []
@@ -198,6 +226,7 @@ for animal in ANIMALS:
             stimulus_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             s_stimulus_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
 
+            # Code for multiple bandwidths
             # stimulus_bw = {'overall': kde_bw, 'target': target_bw, 'non-target': non_target_bw}
             # stimulus_decoder = NDecoder(bw=stimulus_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             # s_stimulus_decoder = NDecoder(bw=stimulus_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
@@ -208,6 +237,7 @@ for animal in ANIMALS:
             choice_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             s_choice_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
 
+            # Code for multiple bandwidths
             # choice_bw = {'overall': kde_bw, 'go': go_bw, 'no-go': no_go_bw}
             # choice_decoder = NDecoder(bw=choice_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             # s_choice_decoder = NDecoder(bw=choice_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
@@ -270,8 +300,9 @@ for animal in ANIMALS:
             mean_accuracy = np.nanmean(accuracy_per_fold)
             mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
             mean_s_accuracy = np.nanmean(s_accuracy_per_fold)
+            mean_s_frac_empty = np.nanmean(s_frac_empty_ISIs_per_fold)
             print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
-            print("SYNTHETIC mean accuracy: %f"%mean_s_accuracy)
+            print("SYNTHETIC mean accuracy: %f, mean frac empty ISIs: %f"%(mean_s_accuracy, mean_s_frac_empty))
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
 
@@ -342,8 +373,9 @@ for animal in ANIMALS:
             mean_accuracy = np.nanmean(accuracy_per_fold)
             mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
             mean_s_accuracy = np.nanmean(s_accuracy_per_fold)
+            mean_s_frac_empty = np.nanmean(s_frac_empty_ISIs_per_fold)
             print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
-            print("SYNTHETIC mean accuracy: %f"%mean_s_accuracy)
+            print("SYNTHETIC mean accuracy: %f, mean frac empty ISIs: %f"%(mean_s_accuracy, mean_s_frac_empty))
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
 
@@ -357,7 +389,7 @@ for animal in ANIMALS:
                 PFC_choice_pval_s.append(pval_s)
 
 np.savez(
-    "cap_end_time", 
+    "accuracies", 
     AC_stim_accuracies=AC_stim_accuracies,
     PFC_stim_accuracies=PFC_stim_accuracies,
     AC_choice_accuracies=AC_choice_accuracies,
