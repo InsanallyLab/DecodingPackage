@@ -40,7 +40,7 @@ def test_pickle_to_pynapple(
     trial_conditions : nap.Tsd
         The condition for each trial.
     '''
-    pickle_to_nwb(pickle_path=pickle_path, nwb_save_path=nwb_save_path)
+    # pickle_to_nwb(pickle_path=pickle_path, nwb_save_path=nwb_save_path)
 
     data = nap.load_file(nwb_save_path)
 

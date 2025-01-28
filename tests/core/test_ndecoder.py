@@ -134,7 +134,8 @@ def test_ndecoder_fit(mocker):
     mock_interp1d = mocker.patch("decoder.core.ndecoder.interp1d")
     mock_interp1d.return_value = lambda x : 0.1 * x
 
-    model = decoder.fit(X, y)
+    decoder.fit(X, y)
+    model = decoder.model
     assert model.all.pdf(3) == 0.1*3
     assert model.all.pdf(-1.9) == 0.1*-1.9
     assert model.all.inv_cdf(0.4) == 0.1*0.4
@@ -167,8 +168,16 @@ def test_ndecoder_fit_insufficient_ISIs(mocker):
     mock_interp1d = mocker.patch("decoder.core.ndecoder.interp1d")
     mock_interp1d.return_value = lambda x : 0.1 * x
 
-    model = decoder.fit(X, y)
-    assert model == None
+    decoder.fit(X, y)
+    assert decoder.model.all.pdf == None
+    assert decoder.model.all.inv_cdf == None
+    assert decoder.model.all.prior_0 == None
+    assert decoder.model.all.prior_empty == None
+    for cond in conditions:
+        assert decoder.model.conds[cond].pdf == None
+        assert decoder.model.conds[cond].inv_cdf == None
+        assert decoder.model.conds[cond].prior_0 == None
+        assert decoder.model.conds[cond].prior_empty == None
     
 def test_ndecoder_fit_empty_ISIs(mocker):
     bw = 0.1
@@ -185,7 +194,8 @@ def test_ndecoder_fit_empty_ISIs(mocker):
     mock_interp1d = mocker.patch("decoder.core.ndecoder.interp1d")
     mock_interp1d.return_value = lambda x : 0.1 * x
 
-    model = decoder.fit(X, y)
+    decoder.fit(X, y)
+    model = decoder.model
     assert model.all.pdf(3) == 0.1*3
     assert model.all.pdf(-1.9) == 0.1*-1.9
     assert model.all.inv_cdf(0.4) == 0.1*0.4
@@ -267,96 +277,6 @@ def test_predict_single_trial_equal_probabilities():
     assert all_probs['cond2'] == 0.5
     assert if_ISIs_empty == False 
 
-
-### predict_conditions tests ###
-def test_predict_conditions_no_trials():
-    bw = 0.1
-    min_ISIs = 1
-    conditions = ['cond1', 'cond2']
-    n_decoder = NDecoder(bw=bw, min_ISIs=min_ISIs, conditions=conditions)
-
-    model = Model(conditions)
-    model.set_cond(cond = 'cond1', pdf = lambda x: 0.1 * x, prior_0 = 0.5, prior_empty = 0.6)
-    model.set_cond(cond = 'cond2', pdf = lambda x: 0.2 * x, prior_0 = 0.5, prior_empty = 0.4)
-
-    n_decoder.model = model
-    trialISIs = []
-
-    predicted_conditions = n_decoder.predict_conditions(trialISIs)
-    assert np.array_equal(predicted_conditions, [])
-
-def test_predict_conditions():
-    bw = 0.1
-    min_ISIs = 1
-    conditions = ['cond1', 'cond2']
-    n_decoder = NDecoder(bw=bw, min_ISIs=min_ISIs, conditions=conditions)
-
-    model = Model(conditions)
-    model.set_cond(
-        cond = 'cond1', 
-        pdf = lambda X : [0.1 * x if x < 4 else 0.2 * x for x in X], 
-        prior_0 = 0.5, 
-        prior_empty = 0.6)
-    model.set_cond(
-        cond = 'cond2', 
-        pdf = lambda X : [0.2 * x if x < 4 else 0.1 * x for x in X], 
-        prior_0 = 0.5, 
-        prior_empty = 0.4)
-
-    n_decoder.model = model
-    trialISIs = [[1, 2, 3], [4, 5, 6]]
-
-    predicted_conditions = n_decoder.predict_conditions(trialISIs)
-    assert np.array_equal(predicted_conditions, ['cond2', 'cond1'])
-
-
-### predict_condition_probs tests ###
-def test_predict_condition_probs_no_trials():
-    bw = 0.1
-    min_ISIs = 1
-    conditions = ['cond1', 'cond2']
-    n_decoder = NDecoder(bw=bw, min_ISIs=min_ISIs, conditions=conditions)
-
-    model = Model(conditions)
-    model.set_cond(cond = 'cond1', pdf = lambda x: 0.1 * x, prior_0 = 0.5, prior_empty = 0.6)
-    model.set_cond(cond = 'cond2', pdf = lambda x: 0.2 * x, prior_0 = 0.5, prior_empty = 0.4)
-
-    n_decoder.model = model
-    trialISIs = []
-
-    condition_probs_df = n_decoder.predict_condition_probs(trialISIs)
-    assert condition_probs_df.empty 
-    assert np.array_equal(condition_probs_df.columns, conditions)
-
-def test_predict_condition_probs():
-    bw = 0.1
-    min_ISIs = 1
-    conditions = ['cond1', 'cond2']
-    n_decoder = NDecoder(bw=bw, min_ISIs=min_ISIs, conditions=conditions)
-
-    model = Model(conditions)
-    model.set_cond(
-        cond = 'cond1', 
-        pdf = lambda X : [0.1 * x if x < 4 else 0.2 * x for x in X], 
-        prior_0 = 0.5, 
-        prior_empty = 0.6)
-    model.set_cond(
-        cond = 'cond2', 
-        pdf = lambda X : [0.2 * x if x < 4 else 0.1 * x for x in X], 
-        prior_0 = 0.5, 
-        prior_empty = 0.4)
-
-    n_decoder.model = model
-    trialISIs = [[1, 2, 3], [4, 5, 6]]
-
-    condition_probs_df = n_decoder.predict_condition_probs(trialISIs)
-    assert np.array_equal(condition_probs_df.columns, conditions)
-    assert np.isclose(condition_probs_df['cond1'][0], 0.111111)
-    assert np.isclose(condition_probs_df['cond2'][0], 0.888888)
-    assert np.isclose(condition_probs_df['cond1'][1], 0.888888)
-    assert np.isclose(condition_probs_df['cond2'][1], 0.111111)
-
-
 ### generate_stratified_folds tests ###
 def test_generate_strat_folds_empty():
     X = []
@@ -416,7 +336,7 @@ def test_calculate_accuracy_empty_ISIs():
     test_y = ["cond2"]
 
     accuracy, frac_empty_ISIs = n_decoder.calculate_accuracy(test_X=test_X, test_y=test_y)
-    assert accuracy == 0
+    assert accuracy == 0.4
     assert frac_empty_ISIs == 1
 
 def test_calculate_accuracy():

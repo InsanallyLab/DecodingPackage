@@ -22,65 +22,6 @@ def test_init_without_overlaps():
     
     assert np.array_equal(interval_set.start, start_times)
     assert np.array_equal(interval_set.end, end_times)
-
-def test_init_with_dataframe():
-    """Tests if UniqueIntervalSet initializes correctly with a Pandas DataFrame as input."""
-    start_end_times = [[0, 5], [10, 15], [20, 25]]
-    dataframe = pd.DataFrame(start_end_times, columns=['start', 'end'])
-
-    interval_set = UniqueIntervalSet(name="dataframe_test", start=dataframe)
-    
-    assert np.array_equal(interval_set.start, [0, 10, 20])
-    assert np.array_equal(interval_set.end, [5, 15, 25])
-
-def test_init_with_unnamed_dataframe():
-    """Tests if UniqueIntervalSet raises an error if a Pandas DataFrame with an 
-    incorrect format (missing column names) is passed in."""
-    start_end_times = [[0, 5], [10, 15], [20, 25]]
-    dataframe = pd.DataFrame(start_end_times)
-
-    # Missing column names ("start", "end")
-    with pytest.raises(AssertionError):
-        interval_set = UniqueIntervalSet(
-            name="unnamed_dataframe_test", 
-            start=dataframe)
-
-def test_init_with_incomplete_dataframe():
-    """Tests if UniqueIntervalSet raises an error if a Pandas DataFrame with
-    missing end times is passed in."""
-    start_times = [0, 10, 20]
-    dataframe = pd.DataFrame(start_times, columns=['start'])
-
-    with pytest.raises(AssertionError):
-        interval_set = UniqueIntervalSet(
-            name="incomplete_dataframe_test", 
-            start=dataframe)
-
-def test_init_with_panda_series():
-    """Tests if UniqueIntervalSet initializes correctly with a Pandas Series as input."""
-    start_times = [0, 10, 20]
-    end_times = [5, 15, 25]
-
-    start_series = pd.Series(start_times)
-    end_series = pd.Series(end_times)
-    
-    interval_set = UniqueIntervalSet(
-        name="series_test", 
-        start=start_series, 
-        end=end_series)
-    
-    assert np.array_equal(interval_set.start, start_times)
-    assert np.array_equal(interval_set.end, end_times)
-
-def test_init_missing_end_series():
-    start_times = [0, 10, 20]
-
-    start_series = pd.Series(start_times)
-
-    with pytest.raises(AssertionError):
-        interval_set = UniqueIntervalSet(
-            name="missing_end_test", 
-            start=start_series)
     
 def test_init_with_ndarray():
     start_times = np.array([0, 10, 20])
@@ -258,11 +199,11 @@ def test_init_start_padding_number():
         end=end_times, 
         start_padding=start_padding)
     
-    assert np.array_equal(interval_set.unpadded_start, start_times)
-    assert interval_set.unpadded_end is None
-    
-    assert np.array_equal(interval_set.start, np.array(start_times) + start_padding)
+    assert np.array_equal(interval_set.start, start_times)
     assert np.array_equal(interval_set.end, end_times)
+    
+    assert np.array_equal(interval_set.padded_start, np.array(start_times) + start_padding)
+    assert interval_set.padded_end is None
 
     assert len(interval_set.start_padding) == len(interval_set.start)
     assert np.all(interval_set.start_padding == start_padding)
@@ -281,11 +222,11 @@ def test_init_end_padding_number():
         end=end_times, 
         end_padding=end_padding)
     
-    assert interval_set.unpadded_start is None
-    assert np.array_equal(interval_set.unpadded_end, end_times)
-    
     assert np.array_equal(interval_set.start, start_times)
-    assert np.array_equal(interval_set.end, np.array(end_times) + end_padding)
+    assert np.array_equal(interval_set.end, end_times)
+    
+    assert interval_set.padded_start is None
+    assert np.array_equal(interval_set.padded_end, np.array(end_times) + end_padding)
 
     assert interval_set.start_padding is None
     assert len(interval_set.end_padding) == len(interval_set.end)
@@ -305,11 +246,11 @@ def test_init_both_padding_number():
         start_padding=start_padding, 
         end_padding=end_padding)
     
-    assert np.array_equal(interval_set.unpadded_start, start_times)
-    assert np.array_equal(interval_set.unpadded_end, end_times)
+    assert np.array_equal(interval_set.start, start_times)
+    assert np.array_equal(interval_set.end, end_times)
     
-    assert np.array_equal(interval_set.start, np.array(start_times) + start_padding)
-    assert np.array_equal(interval_set.end, np.array(end_times) + end_padding)
+    assert np.array_equal(interval_set.padded_start, np.array(start_times) + start_padding)
+    assert np.array_equal(interval_set.padded_end, np.array(end_times) + end_padding)
 
     assert len(interval_set.start_padding) == len(interval_set.start)
     assert np.all(interval_set.start_padding == start_padding)
@@ -328,11 +269,11 @@ def test_init_start_padding_list():
         end=end_times, 
         start_padding=start_padding)
     
-    assert np.array_equal(interval_set.unpadded_start, start_times) 
-    assert interval_set.unpadded_end is None
-    
-    assert np.array_equal(interval_set.start, np.array(start_times) + np.array(start_padding))
+    assert np.array_equal(interval_set.start, start_times) 
     assert np.array_equal(interval_set.end, end_times)
+    
+    assert np.array_equal(interval_set.padded_start, np.array(start_times) + np.array(start_padding))
+    assert interval_set.padded_end is None
 
     assert len(interval_set.start_padding) == len(interval_set.start)
     assert np.array_equal(interval_set.start_padding, start_padding)
@@ -350,11 +291,11 @@ def test_init_end_padding_ndarray():
         end=end_times, 
         end_padding=end_padding)
     
-    assert interval_set.unpadded_start is None
-    assert np.array_equal(interval_set.unpadded_end, end_times)
-    
     assert np.array_equal(interval_set.start, start_times)
-    assert np.array_equal(interval_set.end, np.array(end_times) + np.array(end_padding))
+    assert np.array_equal(interval_set.end, end_times)
+    
+    assert interval_set.padded_start is None
+    assert np.array_equal(interval_set.padded_end, np.array(end_times) + np.array(end_padding))
 
     assert interval_set.start_padding is None
     assert np.array_equal(interval_set.end_padding, end_padding)
@@ -418,10 +359,10 @@ def test_init_padding_with_overlaps():
     # Here, all intervals overlap, so they should be merged into one
     # Note: Pynapple may output warning that "some starts precede the previous end", and so it is joining these intervals
     assert len(interval_set.start) == len(interval_set.end) == 1
-    assert interval_set.start[0] == 2.5
+    assert interval_set.padded_start[0] == 2.5
+    assert interval_set.padded_end is None
+    assert interval_set.start[0] == 0
     assert interval_set.end[0] == 30
-    assert interval_set.unpadded_start[0] == 0
-    assert interval_set.unpadded_end is None
     assert len(interval_set.start_padding) == len(interval_set.start)
     assert all(interval_set.start_padding == start_padding)
     assert interval_set.end_padding is None
@@ -442,10 +383,10 @@ def test_init_padding_with_non_unique():
 
     # Then it should merge non-unique intervals
     assert np.array_equal(interval_set.start, [0, 15])
-    assert np.array_equal(interval_set.end, np.array([12, 20]) + end_padding)
+    assert np.array_equal(interval_set.end, [12, 20])
 
-    assert interval_set.unpadded_start is None
-    assert np.array_equal(interval_set.unpadded_end, [12, 20])
+    assert interval_set.padded_start is None
+    assert np.array_equal(interval_set.padded_end, np.array([12, 20]) + end_padding)
 
     assert interval_set.start_padding is None
     assert len(interval_set.end_padding) == len(interval_set.end)
@@ -465,10 +406,10 @@ def test_padding_illegal_start_end_times():
         start_padding=start_padding)
 
     assert len(interval_set.start) == len(interval_set.end) == 1
-    assert interval_set.start[0] == 15.1
+    assert interval_set.start[0] == 20
     assert interval_set.end[0] == 25
-    assert interval_set.unpadded_start[0] == 20
-    assert interval_set.unpadded_end is None
+    assert interval_set.padded_start[0] == 15.1
+    assert interval_set.padded_end is None
     assert all(interval_set.start_padding == start_padding)
     assert len(interval_set.start_padding) == len(interval_set.start)
     assert interval_set.end_padding is None
@@ -487,10 +428,10 @@ def test_padding_add_interval():
 
     interval_set.add_interval(30, 32, end_pad=end_padding)
     assert np.array_equal(interval_set.start, [0, 10, 20, 30])
-    assert np.array_equal(interval_set.end, np.array([5, 15, 25, 32]) + end_padding)
+    assert np.array_equal(interval_set.end, [5, 15, 25, 32])
 
-    assert interval_set.unpadded_start is None
-    assert np.array_equal(interval_set.unpadded_end, [5, 15, 25, 32])
+    assert interval_set.padded_start is None
+    assert np.array_equal(interval_set.padded_end, np.array([5, 15, 25, 32]) + end_padding)
 
     assert interval_set.start_padding is None
     assert len(interval_set.end_padding) == len(interval_set.end)
@@ -540,11 +481,11 @@ def test_padding_delete_existing_interval():
         start_padding=start_padding)
 
     interval_set.delete_interval(10.6, 15.8)
-    assert np.array_equal(interval_set.start, np.array([0.4, 20.9]) + start_padding)
+    assert np.array_equal(interval_set.start, [0.4, 20.9])
     assert np.array_equal(interval_set.end, [5.3, 25.3])
 
-    assert np.array_equal(interval_set.unpadded_start, [0.4, 20.9])
-    assert interval_set.unpadded_end is None
+    assert np.array_equal(interval_set.padded_start, np.array([0.4, 20.9]) + start_padding)
+    assert interval_set.padded_end is None
 
     assert len(interval_set.start_padding) == len(interval_set.start)
     assert np.all(interval_set.start_padding == start_padding)

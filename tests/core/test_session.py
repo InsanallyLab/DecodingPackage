@@ -211,15 +211,11 @@ def test_slice_spikes():
         
     session.slice_spikes_by_intervals(iset_name=iset_name)
 
-    assert len(session.iset_to_spikes) == 1
-    iset_to_spikes = session.iset_to_spikes[iset_name]
     interval_to_spikes = session.interval_to_spikes[iset_name]
     assert len(interval_to_spikes) == 2
-    assert np.array_equal(iset_to_spikes.t, spike_train)
     assert np.array_equal(interval_to_spikes[(0, 2)].t, [0.7, 1.4])
     assert np.array_equal(interval_to_spikes[(2.5, 4)].t, [2.8, 3.4])
 
-    assert len(session.locked_iset_to_spikes) == 0
     assert len(session.locked_interval_to_spikes) == 0
 
 def test_slice_spikes_outside_intervals():
@@ -243,15 +239,11 @@ def test_slice_spikes_outside_intervals():
 
     session.slice_spikes_by_intervals(iset_name=iset_name)
 
-    assert len(session.iset_to_spikes) == 1
-    iset_to_spikes = session.iset_to_spikes[iset_name]
     interval_to_spikes = session.interval_to_spikes[iset_name]
     assert len(interval_to_spikes) == 2
-    assert np.array_equal(iset_to_spikes.t, [0.7, 1.4, 2.8, 3.4])
     assert np.array_equal(interval_to_spikes[(0, 2)].t, [0.7, 1.4])
     assert np.array_equal(interval_to_spikes[(2.5, 4)].t, [2.8, 3.4])
 
-    assert len(session.locked_iset_to_spikes) == 0
     assert len(session.locked_interval_to_spikes) == 0
 
 def test_slice_spikes_empty_intervals():
@@ -275,15 +267,11 @@ def test_slice_spikes_empty_intervals():
 
     session.slice_spikes_by_intervals(iset_name=iset_name)
 
-    assert len(session.iset_to_spikes) == 1
-    iset_to_spikes = session.iset_to_spikes[iset_name]
     interval_to_spikes = session.interval_to_spikes[iset_name]
     assert len(interval_to_spikes) == 2
-    assert np.array_equal(iset_to_spikes.t, spike_train)
     assert np.array_equal(interval_to_spikes[(0, 2)].t, [0.7, 1.4])
     assert np.array_equal(interval_to_spikes[(2.5, 4)].t, [])
 
-    assert len(session.locked_iset_to_spikes) == 0
     assert len(session.locked_interval_to_spikes) == 0
 
 ### time_lock_to_interval tests ###
@@ -337,11 +325,8 @@ def test_time_lock_interval_start(mock_session):
         iset_name="trial times", 
         lock_point="start")
 
-    assert len(mock_session.locked_iset_to_spikes) == 1
-    locked_iset_to_spikes = mock_session.locked_iset_to_spikes[("start", "trial times")]
     locked_interval_to_spikes = mock_session.locked_interval_to_spikes[("start", "trial times")]
     assert len(locked_interval_to_spikes) == 2
-    assert np.array_equal(locked_iset_to_spikes.t, np.sort([0.7, 1.4, 0.3, 0.9]))
     assert np.array_equal(locked_interval_to_spikes[(0, 2)].t, [0.7, 1.4])
     assert np.array_equal(locked_interval_to_spikes[(2.5, 4)].t, [0.3, 0.9])
 
@@ -351,11 +336,8 @@ def test_time_lock_interval_end(mock_session):
         iset_name="trial times", 
         lock_point="end")
 
-    assert len(mock_session.locked_iset_to_spikes) == 1
-    locked_iset_to_spikes = mock_session.locked_iset_to_spikes[("end", "trial times")]
     locked_interval_to_spikes = mock_session.locked_interval_to_spikes[("end", "trial times")]
     assert len(locked_interval_to_spikes) == 2
-    assert np.array_equal(locked_iset_to_spikes.t, np.sort([-1.3, -0.6, -1.2, -0.6]))
     assert np.array_equal(locked_interval_to_spikes[(0, 2)].t, [-1.3, -0.6])
     assert np.array_equal(locked_interval_to_spikes[(2.5, 4)].t, [-1.2, -0.6])
 
@@ -465,7 +447,7 @@ def test_time_lock_event_wrong_eset(mock_session):
         eset_name="licks", 
         iset_name="trial times")
     # str(KeyError) adds extra quotes ('') in error string
-    assert str(exc_info.value) == "'Event set name does not exist'"
+    assert str(exc_info.value) == "'Event set name passed in as lock point does not exist'"
 
 def test_time_lock_event_pre_slicing(mock_session):
     with pytest.raises(KeyError) as exc_info:
@@ -481,11 +463,8 @@ def test_time_lock_event(mock_session):
     mock_session.slice_spikes_by_intervals(iset_name=iset_name)
     mock_session.time_lock_to_event(eset_name=eset_name, iset_name=iset_name)
 
-    assert len(mock_session.locked_iset_to_spikes) == 1
-    locked_iset_to_spikes = mock_session.locked_iset_to_spikes[(eset_name, iset_name)]
     locked_interval_to_spikes = mock_session.locked_interval_to_spikes[(eset_name, iset_name)]
     assert len(locked_interval_to_spikes) == 2
-    assert np.array_equal(locked_iset_to_spikes.t, np.sort([0.2, 0.9, 0.2, 0.8]))
     assert np.array_equal(locked_interval_to_spikes[(0, 2)].t, [0.2, 0.9])
     assert np.array_equal(locked_interval_to_spikes[(2.5, 4)].t, [0.2, 0.8])
 
