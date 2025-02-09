@@ -43,10 +43,6 @@ ISI decoder as a pickle file.
    python3 basic_workflow.py
    ```
 
-## Contributing
-
-We welcome contributors! If you find any bugs or wish to add a feature, please open an issue or submit a pull request.
-
 ## Acknowledgments
 
 This package is built on the foundational research conducted by Insanally et al. The trial-by-trial spike timing Bayesian decoding algorithm has been detailed in [this paper](https://elifesciences.org/articles/42409#s4). 
