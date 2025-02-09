@@ -1,5 +1,6 @@
 *.pyc 
 
+.DS_Store
 
 to pickl-files.py 
 
@@ -165,4 +166,4 @@ cython_debug/
 #.idea/
 
 ### VisualStudioCode ###
-.vscode/*.DS_Store
+.vscode/*
