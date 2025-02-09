@@ -301,8 +301,8 @@ for animal in ANIMALS:
             mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
             mean_s_accuracy = np.nanmean(s_accuracy_per_fold)
             mean_s_frac_empty = np.nanmean(s_frac_empty_ISIs_per_fold)
-            print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
-            print("SYNTHETIC mean accuracy: %f, mean frac empty ISIs: %f"%(mean_s_accuracy, mean_s_frac_empty))
+            print("Mean accuracy: %f" %mean_accuracy)
+            print("Synthetic mean accuracy: %f"%mean_s_accuracy)
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
 
@@ -374,8 +374,8 @@ for animal in ANIMALS:
             mean_frac_empty = np.nanmean(frac_empty_ISIs_per_fold)
             mean_s_accuracy = np.nanmean(s_accuracy_per_fold)
             mean_s_frac_empty = np.nanmean(s_frac_empty_ISIs_per_fold)
-            print("Mean accuracy: %f, mean frac empty ISIs: %f" %(mean_accuracy, mean_frac_empty))
-            print("SYNTHETIC mean accuracy: %f, mean frac empty ISIs: %f"%(mean_s_accuracy, mean_s_frac_empty))
+            print("Mean accuracy: %f" %mean_accuracy)
+            print("Synthetic mean accuracy: %f"%mean_s_accuracy)
 
             pval_s = mannwhitneyu(accuracy_per_fold,s_accuracy_per_fold).pvalue
 

@@ -1,15 +1,29 @@
-# NDecode: Neural Decoding Package
+# BISI: the Bayesian InterSpike Interval Package
 
-NDecode is a comprehensive solution for the trial-by-trial Spike Timing Bayesian Decoding Algorithm. The project derives inspiration and its algorithmic base from the paper by Insanally et al., which can be accessed [here](https://elifesciences.org/articles/42409#s4).
+BISI is a comprehensive package for the trial-by-trial ISI-based Bayesian decoding algorithm 
+presented in Insanally et al. 
+To accommodate a wide variety of data formats, BISI's data loading and pre-processing 
+pipeline makes use of Pynapple data structures. BISI is designed to decode trial conditions from any experimental dataset, regardless of the specific experimental set-up or data storage format. 
 
 ## Directory Structure
 
 The repository is structured as follows:
 
-- `decoder/`: Main directory containing all the essential files and sub-modules.
-  - `core/`: Core functionalities and implementations of the NDecoder class.
-  - `io/`: Input and output operations related to the decoder.
-  - `main.py`: The main script where the `NDecoder` class is instantiated and utilized.
+- `decoder/`
+  - `core/`: contains all the objects used in BISI's core functionality.
+      - `unique_interval_set.py`: inherits Pynapple's IntervalSet object, which is 
+   used to store trial start and end times. Adds additional capabilities for 
+   preprocessing raw trial data. 
+      - `session.py`: converts raw experimental data into processed log ISI data for each trial.
+      - `ndecoder.py`: represents the Bayesian ISI decoder. 
+      - `model.py`: stores all the necessary probability data for a particular trial condition.
+      - `bandwidth.py`: used to find the optimal bandwidth for Kernel Density Estimation (KDE).
+  - `io/`: contains BISI's data loading and data saving pipeline 
+      - `load_elife_sliding.py`: runs the full BISI workflow on the dataset used for Insanally et al. (2019).
+      - `pickle_to_nwb.py`: generates a NWB file from a pickle file using a custom Neuroconv data loader stored in `pickle_data_interface.py`.
+      - `utils.py`: provides additional functionality such as converting time units for trial start and end times. 
+
+For a deep dive into the methods, parameters, and return values, check the comments provided in the source files.
 
 ## Getting Started
 
@@ -19,18 +33,15 @@ The repository is structured as follows:
    git clone [repository_link]
    ```
 
-2. **Navigate to the Directory**:
+2. **Basic Usage**: You'll find a minimal working example of a simplified BISI workflow below, 
+which loads an example dataset from a pickle file, runs the BISI algorithm using a 
+fixed window rather than a sliding window, and then saves the generated Bayesian
+ISI decoder as a pickle file. 
 
    ```bash
    cd path_to_repository/decoder
+   python3 basic_workflow.py
    ```
-## Detailed Documentation
-
-For a deep dive into the methods, parameters, and return values, check the comments and docstrings provided in the source files.
-
-- Core functionalities: `decoder/core`
-- IO Operations: `decoder/io`
-- Main implementation and usage examples: `decoder/main.py`
 
 ## Contributing
 
@@ -38,6 +49,7 @@ We welcome contributors! If you find any bugs or wish to add a feature, please o
 
 ## Acknowledgments
 
-This project is built on the foundational research conducted by Insanally et al. The trial-by-trial Spike Timing Bayesian Decoding Algorithm, which is the core of this implementation, has been detailed in [this paper](https://elifesciences.org/articles/42409#s4) by Insanally et al.
+This package is built on the foundational research conducted by Insanally et al. The trial-by-trial spike timing Bayesian decoding algorithm has been detailed in [this paper](https://elifesciences.org/articles/42409#s4). 
+This package also uses [Pynapple](https://github.com/pynapple-org/pynapple) data structures for its I/O layer, and provides functionality to convert pickle files to NWB files using [Neuroconv](https://github.com/catalystneuro/neuroconv).
 
 ## License

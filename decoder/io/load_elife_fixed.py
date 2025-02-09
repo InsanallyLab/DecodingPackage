@@ -126,7 +126,7 @@ for animal in ANIMALS:
             print("KDE bandwidth: ", kde_bw)
 
             # Make stimulus decoder. 
-            min_ISIs = 5
+            min_ISIs = 1
             possible_conditions = ["target", "non-target"]
             stimulus_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
             s_stimulus_decoder = NDecoder(bw=kde_bw, min_ISIs=min_ISIs, conditions=possible_conditions)
