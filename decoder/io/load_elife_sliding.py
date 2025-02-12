@@ -33,15 +33,18 @@ for animal in ANIMALS:
     animal_dict = ANIMALS[animal]
 
     if animal_dict['include']:
-        print(animal)
-
         spike_files = animal_dict['spike_files']
         event_files = animal_dict['event_files']
         neurons = animal_dict['choice_neurons']
         trial_duration = animal_dict['trial_duration']
     
         (event_set, spike_set) = load_events_spikes_script(neuron_num=neurons, spike_files=spike_files, event_files=event_files)
-        
+        # Skip if file not found
+        if None in event_set:
+            continue 
+
+        print(animal)
+
         variable_maps = animal_dict['variables']
         stim_variables = ['T', 'F']
         action_variables = ['NPT', 'NPF']

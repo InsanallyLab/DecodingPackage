@@ -33,7 +33,6 @@ for animal in ANIMALS:
 
     animal_dict = ANIMALS[animal]
     if animal_dict['include']:
-        print(animal)
 
         spike_files = animal_dict['spike_files']
         event_files = animal_dict['event_files']
@@ -41,6 +40,12 @@ for animal in ANIMALS:
     
         (event_set, spike_set) = load_events_spikes_script(neuron_num=neurons, spike_files=spike_files, event_files=event_files)
         
+        # Skip if file not found
+        if None in event_set:
+            continue 
+
+        print(animal)
+
         variable_maps = animal_dict['variables']
         stim_variables = ['T', 'F']
         action_variables = ['NPT', 'NPF']
@@ -259,7 +264,7 @@ for animal in ANIMALS:
                 PFC_choice_pval_s.append(pval_s)
 
 np.savez(
-    "accuracies", 
+    "fixed_window_accuracies", 
     AC_stim_accuracies=AC_stim_accuracies,
     PFC_stim_accuracies=PFC_stim_accuracies,
     AC_choice_accuracies=AC_choice_accuracies,
