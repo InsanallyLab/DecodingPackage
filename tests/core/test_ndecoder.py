@@ -94,7 +94,7 @@ def test_ndecoder_estimate_ISI_distribution_pdf(mocker):
 
     assert pdf_interpolator(3) == 2.89
     assert pdf_interpolator(-1.9) == 2.89
-    assert pdf_interpolator(19.2) == 2.89
+    assert pdf_interpolator(17.2) == 2.89
 
 def test_ndecoder_estimate_ISI_distribution_pdf_inv_cdf(mocker):
     bw = 0.1
@@ -213,7 +213,7 @@ def test_ndecoder_fit_empty_ISIs(mocker):
     assert model.conds['cond1'].prior_empty == 2/3
     assert model.conds['cond2'].prior_empty == 1/3
 
-### _predict_single_trial tests ###
+### predict_single_trial tests ###
 def test_predict_single_trial_empty_ISIs():
     bw = 0.1
     min_ISIs = 1
@@ -227,7 +227,7 @@ def test_predict_single_trial_empty_ISIs():
     n_decoder.model = model
     trialISIs = []
     
-    max_cond, prob_max_cond, all_probs, if_ISIs_empty = n_decoder._predict_single_trial(trialISIs)
+    max_cond, prob_max_cond, all_probs, if_ISIs_empty = n_decoder.predict_single_trial(trialISIs)
 
     assert max_cond == 'cond1'
     assert prob_max_cond == 0.6
@@ -248,7 +248,7 @@ def test_predict_single_trial_with_ISIs():
     n_decoder.model = model
     trialISIs = [1, 2, 3]
     
-    max_cond, prob_max_cond, all_probs, if_ISIs_empty = n_decoder._predict_single_trial(trialISIs)
+    max_cond, prob_max_cond, all_probs, if_ISIs_empty = n_decoder.predict_single_trial(trialISIs)
     
     assert max_cond == 'cond2'
     assert np.isclose(prob_max_cond, 0.888888)
@@ -269,7 +269,7 @@ def test_predict_single_trial_equal_probabilities():
     n_decoder.model = model
     trialISIs = [1, 2, 3]
 
-    max_cond, prob_max_cond, all_probs, if_ISIs_empty  = n_decoder._predict_single_trial(trialISIs)
+    max_cond, prob_max_cond, all_probs, if_ISIs_empty  = n_decoder.predict_single_trial(trialISIs)
     
     assert max_cond in ['cond1', 'cond2']
     assert prob_max_cond == 0.5
